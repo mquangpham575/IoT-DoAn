@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environmental Monitor | Full Spectrum Dashboard</title>
+    <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --accent: #10b981;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-primary); padding: 1.5rem; line-height: 1.5; }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+        .header-title h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .header-title span { color: var(--text-secondary); font-size: 0.875rem; }
+
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .status-badge { 
+            display: flex; align-items: center; gap: 0.5rem; 
+            background: rgba(16, 185, 129, 0.1); color: var(--accent);
+            padding: 0.4rem 0.8rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            transition: transform 0.2s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); border-color: var(--blue); }
+        .kpi-head { display: flex; justify-content: space-between; color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .kpi-head i { font-size: 1.1rem; color: var(--blue); }
+        .kpi-body { display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.25rem; }
+        .kpi-val { font-size: 1.8rem; font-weight: 700; color: #fff; }
+        .kpi-unit { font-size: 0.875rem; color: var(--text-secondary); }
+        .kpi-foot { font-size: 0.7rem; font-weight: 500; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .chart-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chart-wrapper { position: relative; height: 300px; width: 100%; }
+        .log-wrapper { flex: 1; overflow-y: auto; max-height: 300px; }
+        
+        .panel-head { font-size: 0.875rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; color: var(--text-secondary); text-transform: uppercase; }
+
+        .full-width { grid-column: span 2; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--text-secondary); font-size: 0.7rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); }
+        td { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+        .severity { padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.65rem; }
+        .sev-0 { color: var(--accent); }
+        .sev-1 { background: rgba(245, 158, 11, 0.1); color: var(--yellow); }
+        .sev-2 { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+
+        canvas { flex: 1; width: 100% !important; }
+
+        @media (max-width: 1024px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>Sentinel Full Spectrum</h1>
+                <span id="last-updated">Status: Synchronizing sensors...</span>
+            </div>
+            <div class="header-actions">
+                <div class="status-badge"><div class="dot"></div> LIVE NODE</div>
+                <button onclick="exportCSV()" style="background: var(--blue); color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">EXPORT CSV</button>
+            </div>
+        </header>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-head">TEMPERATURE <i class="fa-solid fa-thermometer-half"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-temp">--</span><span class="kpi-unit">°C</span></div>
+                <div class="kpi-foot" id="trend-temp">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">HUMIDITY <i class="fa-solid fa-droplet"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-humid">--</span><span class="kpi-unit">%</span></div>
+                <div class="kpi-foot" id="trend-humid">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">GAS (MQ135) <i class="fa-solid fa-wind"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-gas">--</span><span class="kpi-unit">ppm</span></div>
+                <div class="kpi-foot" id="trend-gas">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">LIGHT (LUX) <i class="fa-solid fa-sun"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-light">--</span><span class="kpi-unit">lux</span></div>
+                <div class="kpi-foot" id="trend-light">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">NOISE INDEX <i class="fa-solid fa-volume-high"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-noise">--</span><span class="kpi-unit">raw</span></div>
+                <div class="kpi-foot" id="trend-noise">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">HEALTH STATUS <i class="fa-solid fa-heart-pulse"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-comfort" style="font-size: 1.2rem;">WAITING</span></div>
+                <div class="kpi-foot" id="val-method">Core v6.2</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-panel">
+                <div class="panel-head">Environment Correlation (Temperature/Humidity)</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart-env"></canvas>
+                </div>
+            </div>
+            <div class="chart-panel">
+                <div class="panel-head">Air Quality & Safety (Gas)</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart-gas"></canvas>
+                </div>
+            </div>
+            <div class="chart-panel">
+                <div class="panel-head">Sensory Dynamics (Light/Noise)</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart-sensory"></canvas>
+                </div>
+            </div>
+            <div class="chart-panel">
+                <div class="panel-head">Forensic Alarm Activity</div>
+                <div class="log-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>TIMESTAMP</th>
+                                <th>SEVERITY</th>
+                                <th>METRICS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alarm-log">
+                            <!-- Data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const commonOptions = { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            interaction: { mode: 'index', intersect: false },
+            scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } }
+        };
+
+        const chartEnv = new Chart(document.getElementById('chart-env'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label: 'Temp', borderColor: '#3b82f6', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: 'Humid', borderColor: '#a855f7', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 }
+            ]},
+            options: commonOptions
+        });
+
+        const chartGas = new Chart(document.getElementById('chart-gas'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label: 'Gas', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.05)', data: [], fill: true, tension: 0.3, pointRadius: 0 }
+            ]},
+            options: commonOptions
+        });
+
+        const chartSensory = new Chart(document.getElementById('chart-sensory'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label: 'Light', borderColor: '#fbbf24', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: 'Noise', borderColor: '#10b981', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 }
+            ]},
+            options: commonOptions
+        });
+
+        let cachedData = [];
+        async function fetchData() {
+            try {
+                const res = await fetch('/history?limit=30');
+                const data = await res.json();
+                if (data.length > 0) {
+                    cachedData = data;
+                    const cur = data[0];
+
+                    document.getElementById('val-temp').innerText = cur.temp.toFixed(1);
+                    document.getElementById('val-humid').innerText = cur.humid.toFixed(1);
+                    document.getElementById('val-gas').innerText = cur.gas;
+                    document.getElementById('val-light').innerText = cur.light.toFixed(1);
+                    document.getElementById('val-noise').innerText = cur.noise;
+                    document.getElementById('last-updated').innerText = `Update: ${cur.timestamp}`;
+
+                    const levels = ["NORMAL", "WARNING", "CRITICAL"];
+                    const colors = ["#10b981", "#f59e0b", "#ef4444"];
+                    const comfortEl = document.getElementById('val-comfort');
+                    comfortEl.innerText = levels[cur.comfort_level];
+                    comfortEl.style.color = colors[cur.comfort_level];
+                    document.getElementById('val-method').innerText = `AI: ${cur.method || 'Hybrid'}`;
+
+                    if (data.length > 1) {
+                        const prev = data[1];
+                        updateTrend('temp', cur.temp, prev.temp, '°C');
+                        updateTrend('humid', cur.humid, prev.humid, '%');
+                        updateTrend('gas', cur.gas, prev.gas, 'ppm');
+                        updateTrend('light', cur.light, prev.light, 'lx');
+                        updateTrend('noise', cur.noise, prev.noise, '');
+                    }
+
+                    const hist = [...data].reverse();
+                    const labels = hist.map(d => d.timestamp.split(' ')[1]);
+                    
+                    chartEnv.data.labels = labels;
+                    chartEnv.data.datasets[0].data = hist.map(d => d.temp);
+                    chartEnv.data.datasets[1].data = hist.map(d => d.humid);
+                    chartEnv.update('none');
+
+                    chartGas.data.labels = labels;
+                    chartGas.data.datasets[0].data = hist.map(d => d.gas);
+                    chartGas.update('none');
+
+                    chartSensory.data.labels = labels;
+                    chartSensory.data.datasets[0].data = hist.map(d => d.light);
+                    chartSensory.data.datasets[1].data = hist.map(d => d.noise);
+                    chartSensory.update('none');
+
+                    const log = document.getElementById('alarm-log');
+                    log.innerHTML = data.filter(d => d.comfort_level > 0).slice(0, 10).map(d => {
+                        let issues = [];
+                        if (d.temp > 35) issues.push(`High Temp (${d.temp.toFixed(1)}°)`);
+                        if (d.humid > 85) issues.push(`High Humidity (${d.humid.toFixed(0)}%)`);
+                        if (d.gas > 2000) issues.push(`Hazardous Gas (${d.gas})`);
+                        if (d.light < 10) issues.push(`Too Dark (${d.light.toFixed(0)}lx)`);
+                        if (d.noise > 3000) issues.push(`Loud Noise (${d.noise})`);
+                        
+                        if (issues.length === 0) issues.push("AI Anomaly Detected");
+
+                        return `
+                            <tr>
+                                <td>${d.timestamp.split(' ')[1]}</td>
+                                <td><span class="severity sev-${d.comfort_level}">${levels[d.comfort_level]}</span></td>
+                                <td style="color:var(--red); font-weight:600;">${issues.join(' | ')}</td>
+                            </tr>
+                        `;
+                    }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:2rem;">Environment Normal</td></tr>';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function updateTrend(id, cur, prev, unit) {
+            const el = document.getElementById(`trend-${id}`);
+            const diff = (cur - prev).toFixed(1);
+            if (diff > 0) el.innerHTML = `<span style="color:var(--red)">▲ +${diff}${unit}</span>`;
+            else if (diff < 0) el.innerHTML = `<span style="color:var(--accent)">▼ ${diff}${unit}</span>`;
+            else el.innerHTML = `<span style="color:var(--text-secondary)">STABLE</span>`;
+        }
+
+        function exportCSV() {
+            let csv = "Timestamp,Temp,Humid,Gas,Light,Noise,Comfort\n" + cachedData.map(d => `${d.timestamp},${d.temp},${d.humid},${d.gas},${d.light},${d.noise},${d.comfort_level}`).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'full_iot_data.csv'; a.click();
+        }
+
+        setInterval(fetchData, 5000);
+        fetchData();
+    </script>
+</body>
+</html>

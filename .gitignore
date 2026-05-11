@@ -1,1 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/iot_data.db
+
+# Android/Gradle
+.gradle/
+build/
+app/build/
+mobile/.gradle/
+mobile/app/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+
 test_guide.md
