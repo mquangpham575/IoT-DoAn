@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from zeroconf.asyncio import AsyncZeroconf
 from zeroconf import ServiceInfo
 import socket
+from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 
@@ -70,6 +71,15 @@ async def lifespan(app: FastAPI):
     await zc.async_close()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 model = joblib.load(MODEL_PATH) if os.path.exists(MODEL_PATH) else None

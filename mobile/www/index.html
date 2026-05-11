@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environmental Monitor | Mobile</title>
+    <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --accent: #10b981;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-primary); padding: 1.5rem; line-height: 1.5; }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+        .header-title h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .header-title span { color: var(--text-secondary); font-size: 0.875rem; }
+
+        .header-actions { display: flex; gap: 0.5rem; align-items: center; }
+        .status-badge { 
+            display: flex; align-items: center; gap: 0.5rem; 
+            background: rgba(16, 185, 129, 0.1); color: var(--accent);
+            padding: 0.4rem 0.8rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+        }
+        .kpi-head { display: flex; justify-content: space-between; color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+        .kpi-head i { font-size: 1rem; color: var(--blue); }
+        .kpi-body { display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.25rem; }
+        .kpi-val { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .kpi-unit { font-size: 0.75rem; color: var(--text-secondary); }
+        .kpi-foot { font-size: 0.65rem; font-weight: 500; }
+
+        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        .chart-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-wrapper { position: relative; height: 250px; width: 100%; }
+        .log-wrapper { max-height: 300px; overflow-y: auto; }
+        
+        .panel-head { font-size: 0.875rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; color: var(--text-secondary); text-transform: uppercase; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--text-secondary); font-size: 0.65rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); }
+        td { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; }
+        .severity { padding: 0.2rem 0.4rem; border-radius: 4px; font-weight: 700; font-size: 0.6rem; }
+        .sev-0 { color: var(--accent); }
+        .sev-1 { background: rgba(245, 158, 11, 0.1); color: var(--yellow); }
+        .sev-2 { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+
+        /* Modal Settings */
+        #settings-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-content {
+            background: var(--bg-card); padding: 2rem; border-radius: 1rem; border: 1px solid var(--border); width: 90%; max-width: 400px;
+        }
+        .modal-content h2 { margin-bottom: 1rem; font-size: 1.25rem; }
+        .modal-content input {
+            width: 100%; padding: 0.75rem; background: var(--bg-body); border: 1px solid var(--border); color: #fff; border-radius: 0.5rem; margin-bottom: 1rem;
+        }
+        .btn-primary { background: var(--blue); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-weight: 600; width: 100%; }
+        
+        @media (min-width: 1024px) {
+            .charts-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div id="settings-modal">
+        <div class="modal-content">
+            <h2>Backend Settings</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Enter your PC's local IP address (e.g., 192.168.1.5:8000)</p>
+            <input type="text" id="ip-input" placeholder="http://192.168.1.5:8000">
+            <button class="btn-primary" onclick="saveSettings()">CONNECT</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>Sentinel Mobile</h1>
+                <span id="last-updated">Status: Offline</span>
+                <div id="debug-error" style="color: var(--red); font-size: 0.6rem; margin-top: 0.2rem; display: none;"></div>
+            </div>
+            <div class="header-actions">
+                <button onclick="document.getElementById('settings-modal').style.display='flex'" style="background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); width: 32px; height: 32px; border-radius: 4px; cursor: pointer;"><i class="fa-solid fa-gear"></i></button>
+                <div class="status-badge"><div class="dot" id="status-dot"></div> <span id="status-text">DISCONNECTED</span></div>
+            </div>
+        </header>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-head">TEMP <i class="fa-solid fa-thermometer-half"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-temp">--</span><span class="kpi-unit">°C</span></div>
+                <div class="kpi-foot" id="trend-temp">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">HUMID <i class="fa-solid fa-droplet"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-humid">--</span><span class="kpi-unit">%</span></div>
+                <div class="kpi-foot" id="trend-humid">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">GAS <i class="fa-solid fa-wind"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-gas">--</span><span class="kpi-unit">ppm</span></div>
+                <div class="kpi-foot" id="trend-gas">---</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-head">COMFORT <i class="fa-solid fa-heart-pulse"></i></div>
+                <div class="kpi-body"><span class="kpi-val" id="val-comfort" style="font-size: 1rem;">WAITING</span></div>
+                <div class="kpi-foot" id="val-method">Core v6.2</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-panel">
+                <div class="panel-head">Environment Correlation</div>
+                <div class="chart-wrapper"><canvas id="chart-env"></canvas></div>
+            </div>
+            <div class="chart-panel">
+                <div class="panel-head">Forensic Alarm Activity</div>
+                <div class="log-wrapper">
+                    <table>
+                        <thead><tr><th>TIME</th><th>SEV</th><th>ISSUES</th></tr></thead>
+                        <tbody id="alarm-log"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let serverUrl = localStorage.getItem('server_ip') || '';
+        if (!serverUrl) document.getElementById('settings-modal').style.display = 'flex';
+
+        function saveSettings() {
+            let ip = document.getElementById('ip-input').value.trim();
+            if (!ip.startsWith('http')) ip = 'http://' + ip;
+            localStorage.setItem('server_ip', ip);
+            serverUrl = ip;
+            document.getElementById('settings-modal').style.display = 'none';
+            fetchData();
+        }
+
+        Chart.defaults.color = '#94a3b8';
+        const commonOptions = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } } };
+
+        const chartEnv = new Chart(document.getElementById('chart-env'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label: 'Temp', borderColor: '#3b82f6', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: 'Humid', borderColor: '#a855f7', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 }
+            ]},
+            options: commonOptions
+        });
+
+        async function fetchData() {
+            if (!serverUrl) return;
+            const debugEl = document.getElementById('debug-error');
+            try {
+                const res = await fetch(`${serverUrl}/history?limit=20`);
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                const data = await res.json();
+                
+                debugEl.style.display = 'none';
+                document.getElementById('status-dot').style.background = '#10b981';
+                document.getElementById('status-text').innerText = 'CONNECTED';
+                document.getElementById('status-text').style.color = '#10b981';
+
+                if (data.length > 0) {
+                    const cur = data[0];
+                    document.getElementById('val-temp').innerText = cur.temp.toFixed(1);
+                    document.getElementById('val-humid').innerText = cur.humid.toFixed(1);
+                    document.getElementById('val-gas').innerText = cur.gas;
+                    document.getElementById('last-updated').innerText = `Sync: ${cur.timestamp.split(' ')[1]}`;
+
+                    const levels = ["NORMAL", "WARNING", "CRITICAL"];
+                    const colors = ["#10b981", "#f59e0b", "#ef4444"];
+                    const comfortEl = document.getElementById('val-comfort');
+                    comfortEl.innerText = levels[cur.comfort_level];
+                    comfortEl.style.color = colors[cur.comfort_level];
+
+                    const hist = [...data].reverse();
+                    const labels = hist.map(d => d.timestamp.split(' ')[1]);
+                    chartEnv.data.labels = labels;
+                    chartEnv.data.datasets[0].data = hist.map(d => d.temp);
+                    chartEnv.data.datasets[1].data = hist.map(d => d.humid);
+                    chartEnv.update('none');
+
+                    const log = document.getElementById('alarm-log');
+                    log.innerHTML = data.filter(d => d.comfort_level > 0).slice(0, 5).map(d => {
+                        return `<tr><td>${d.timestamp.split(' ')[1]}</td><td><span class="severity sev-${d.comfort_level}">${levels[d.comfort_level]}</span></td><td style="color:var(--red)">Anom</td></tr>`;
+                    }).join('') || '<tr><td colspan="3" style="text-align:center;padding:1rem;">Normal</td></tr>';
+                }
+            } catch (e) { 
+                debugEl.innerText = `Error: ${e.message}`;
+                debugEl.style.display = 'block';
+                document.getElementById('status-dot').style.background = '#ef4444';
+                document.getElementById('status-text').innerText = 'OFFLINE';
+                document.getElementById('status-text').style.color = '#ef4444';
+            }
+        }
+
+        setInterval(fetchData, 5000);
+        fetchData();
+    </script>
+</body>
+</html>

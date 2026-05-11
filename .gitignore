@@ -1,18 +1,23 @@
-# Python
+# --- Backend (Python) ---
 __pycache__/
 *.py[cod]
-*$py.class
 backend/iot_data.db
 
-# Android/Gradle
+# --- Mobile (Node/Capacitor) ---
+node_modules/
+mobile/node_modules/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+
+# --- General / IDE ---
 .gradle/
-build/
-app/build/
-mobile/.gradle/
-mobile/app/build/
-*.iml
+**/build/
+**/.gradle/
+**/*.iml
 .idea/
 local.properties
 .DS_Store
 
+# --- Misc ---
 test_guide.md

@@ -1,0 +1,10 @@
+{
+  "appId": "com.example.iothealth",
+  "appName": "IoT Health",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
