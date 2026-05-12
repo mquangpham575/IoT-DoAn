@@ -1,0 +1,2 @@
+timestamp,device_id,temperature,humidity,gas,light,noise,status_label,risk_score,reasons,recommendation,source
+2026-05-13 10:30:00,esp32_01,30.5,72.0,1250,650,320,WARNING,35,"Moderate air quality risk","Không khí có dấu hiệu kém an toàn...",real_esp32
