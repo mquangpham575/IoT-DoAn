@@ -4,6 +4,7 @@ from app.config import settings
 from app.database import get_latest_reading, get_reading_history, insert_sensor_reading
 from app.schemas import ApiResponse, SensorReadingCreate
 from app.services.comfort_service import evaluate_sensor_reading
+from app.services.notification_service import notify_if_needed
 from app.utils.response_utils import success_response
 
 
@@ -22,11 +23,15 @@ def _validate_api_key(x_api_key: str | None) -> None:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 
-def _process_sensor_reading(payload: SensorReadingCreate) -> dict:
+def _process_sensor_reading(payload: SensorReadingCreate, source: str = "http") -> dict:
     raw_data = _payload_to_dict(payload)
     processed = evaluate_sensor_reading(raw_data)
+    processed["source"] = source
+
     new_id = insert_sensor_reading(processed)
     processed["id"] = new_id
+
+    notify_if_needed(processed)
     return processed
 
 
@@ -36,10 +41,10 @@ async def create_sensor_reading(
     x_api_key: str | None = Header(default=None, alias="X-API-KEY"),
 ):
     """
-    Main API for ESP32/simulator to send sensor data.
+    Main API for ESP32/simulator to send sensor data via HTTP.
     """
     _validate_api_key(x_api_key)
-    processed = _process_sensor_reading(payload)
+    processed = _process_sensor_reading(payload, source="http")
     return success_response(data=processed, message="Sensor reading saved")
 
 
@@ -62,7 +67,7 @@ async def legacy_create_sensor_reading(
     x_api_key: str | None = Header(default=None, alias="X-API-KEY"),
 ):
     _validate_api_key(x_api_key)
-    processed = _process_sensor_reading(payload)
+    processed = _process_sensor_reading(payload, source="legacy_http")
     return {
         "status": "success",
         "comfort": processed["comfort_level"],
@@ -77,7 +82,7 @@ async def legacy_create_sensor_reading(
 @legacy_router.get("/history")
 def legacy_read_history(limit: int = Query(default=50, ge=1, le=500)):
     """
-    Keep old format as a list so the existing dashboard can still run.
+    Keep old format as a list so the existing dashboard/mobile can still run.
     """
     history = get_reading_history(limit=limit)
 

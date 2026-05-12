@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import init_db
 from app.routers import dashboard_router, device_router, sensor_router, system_router
+from app.services.mqtt_service import start_mqtt_subscriber, stop_mqtt_subscriber
 
 
 def create_app() -> FastAPI:
@@ -22,8 +23,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    init_db()
-
     if settings.STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(settings.STATIC_DIR)), name="static")
 
@@ -32,6 +31,15 @@ def create_app() -> FastAPI:
     app.include_router(sensor_router.legacy_router)
     app.include_router(device_router.router)
     app.include_router(system_router.router)
+
+    @app.on_event("startup")
+    async def on_startup() -> None:
+        init_db()
+        app.state.mqtt_client = start_mqtt_subscriber()
+
+    @app.on_event("shutdown")
+    async def on_shutdown() -> None:
+        stop_mqtt_subscriber(getattr(app.state, "mqtt_client", None))
 
     return app
 
