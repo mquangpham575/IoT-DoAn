@@ -36,3 +36,8 @@ backend/ml/*.pkl
 # Windows downloaded file metadata in WSL
 *:Zone.Identifier
 **/*:Zone.Identifier
+
+# Python virtual environments
+.venv/
+venv/
+backend/.venv/
