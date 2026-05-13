@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: iot-health-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      ENABLE_MQTT: "true"
+      MQTT_HOST: mqtt
+      MQTT_PORT: "1883"
+    volumes:
+      - ./backend/data:/app/data
+    depends_on:
+      - mqtt
+    restart: unless-stopped
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: iot-mqtt-broker
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./backend/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    restart: unless-stopped
+
+volumes:
+  mqtt-data:
+  mqtt-log:
