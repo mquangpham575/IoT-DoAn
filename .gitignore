@@ -1,11 +1,19 @@
 # --- Backend (Python) ---
 __pycache__/
 *.py[cod]
-backend/iot_data.db
+backend/data/
+*.db
+*.log
+.env
+.env.local
+
+# --- AI Models ---
+# comfort_model.pkl  <-- Un-comment if you want to push the official model
 
 # --- Mobile (Node/Capacitor) ---
 node_modules/
 mobile/node_modules/
+mobile/dist/
 mobile/android/.gradle/
 mobile/android/app/build/
 mobile/android/local.properties
@@ -16,8 +24,10 @@ mobile/android/local.properties
 **/.gradle/
 **/*.iml
 .idea/
+.vscode/
 local.properties
 .DS_Store
 
 # --- Misc ---
 test_guide.md
+iot_project.tar.gz
