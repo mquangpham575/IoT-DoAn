@@ -2,6 +2,13 @@
   "appId": "com.example.iothealth",
   "appName": "IoT Health",
   "webDir": "www",
+  "server": {
+    "allowNavigation": [
+      "20.212.105.13",
+      "20.212.105.13:8000",
+      "http://20.212.105.13:8000"
+    ]
+  },
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
