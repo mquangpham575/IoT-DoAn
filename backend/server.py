@@ -1,3 +1,4 @@
+# [DEPRECATED] This file is an old version. Use 'run.py' or 'app/main.py' for the modular backend.
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates

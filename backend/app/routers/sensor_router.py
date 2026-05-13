@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
 import time
 
 from app.config import settings
@@ -24,7 +24,12 @@ def _validate_api_key(x_api_key: str | None) -> None:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 
-def _process_sensor_reading(payload: SensorReadingCreate, request: Request, source: str = "http") -> dict:
+def _process_sensor_reading(
+    payload: SensorReadingCreate, 
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    source: str = "http"
+) -> dict:
     raw_data = _payload_to_dict(payload)
     processed = evaluate_sensor_reading(raw_data)
     processed["source"] = source
@@ -35,7 +40,8 @@ def _process_sensor_reading(payload: SensorReadingCreate, request: Request, sour
     new_id = insert_sensor_reading(processed)
     processed["id"] = new_id
 
-    notify_if_needed(processed)
+    # Run notification in background to avoid blocking the HTTP response
+    background_tasks.add_task(notify_if_needed, processed)
     return processed
 
 
@@ -43,13 +49,14 @@ def _process_sensor_reading(payload: SensorReadingCreate, request: Request, sour
 async def create_sensor_reading(
     payload: SensorReadingCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     x_api_key: str | None = Header(default=None, alias="X-API-KEY"),
 ):
     """
     Main API for ESP32/simulator to send sensor data via HTTP.
     """
     _validate_api_key(x_api_key)
-    processed = _process_sensor_reading(payload, request, source="http")
+    processed = _process_sensor_reading(payload, request, background_tasks, source="http")
     return success_response(data=processed, message="Sensor reading saved")
 
 
@@ -70,10 +77,11 @@ def read_sensor_history(limit: int = Query(default=50, ge=1, le=500)):
 async def legacy_create_sensor_reading(
     payload: SensorReadingCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     x_api_key: str | None = Header(default=None, alias="X-API-KEY"),
 ):
     _validate_api_key(x_api_key)
-    processed = _process_sensor_reading(payload, request, source="legacy_http")
+    processed = _process_sensor_reading(payload, request, background_tasks, source="legacy_http")
     return {
         "status": "success",
         "comfort": processed["comfort_level"],

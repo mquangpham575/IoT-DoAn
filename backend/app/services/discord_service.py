@@ -59,9 +59,16 @@ def send_discord_alert(reading: dict[str, Any]) -> bool:
 
     try:
         response = requests.post(settings.DISCORD_WEBHOOK_URL, json=payload, timeout=5)
-        response.raise_for_status()
+        if response.status_code >= 400:
+            logger.error(
+                "Discord webhook error: %s - %s", 
+                response.status_code, 
+                response.text
+            )
+            return False
+        
         logger.info("Discord alert sent for %s with status %s.", device_id, status_label)
         return True
     except requests.RequestException as exc:
-        logger.error("Failed to send Discord alert: %s", exc)
+        logger.error("Network error sending Discord alert: %s", exc)
         return False
