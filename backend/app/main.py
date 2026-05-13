@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -14,6 +15,9 @@ def create_app() -> FastAPI:
         version=settings.APP_VERSION,
         description="Backend API for IoT environmental health monitoring system.",
     )
+
+    # Helps significantly on slow/mobile networks by compressing HTML/JSON responses.
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
     app.add_middleware(
         CORSMiddleware,
