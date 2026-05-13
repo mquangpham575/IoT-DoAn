@@ -21,7 +21,7 @@ The system follows a decentralized sensing, centralized processing architecture:
     *   Local alert triggers (LED/Buzzer).
     *   Dynamic network configuration via WiFiManager.
     *   mDNS-based backend discovery.
-### 2. Logic Layer (Modular FastAPI & Hybrid AI):
+2.  **Logic Layer (Modular FastAPI & Hybrid AI)**:
     *   **Modular Architecture**: Separated concerns (Routers, Services, Schemas) for enterprise-grade maintainability.
     *   **Hybrid Engine**: Combines deterministic logic (Edge safety) with machine learning (RandomForest) for comfort assessment.
     *   **Alerting**: Integrated Discord Webhooks for real-time critical notifications.
@@ -37,10 +37,10 @@ The system follows a decentralized sensing, centralized processing architecture:
 | Component | Technology | Role |
 | :--- | :--- | :--- |
 | **Firmware** | C++ (Arduino/ESP32), WiFiManager, ESPmDNS | Edge Sensing & Watchdog |
-| **Backend** | Python (FastAPI), aiosqlite, Paho-MQTT | Modular API & Notification Engine |
-| **AI/ML** | Scikit-learn (RandomForest), Pandas | Comfort Level Prediction (5 features) |
+| **Backend** | Python (FastAPI), Requests, Paho-MQTT | Modular API & Notification Engine |
+| **AI/ML** | Scikit-learn (RandomForest), Pandas | Comfort Level Prediction (3 features) |
 | **Messaging** | Mosquitto (MQTT), Discord Webhooks | Alerting & Pub/Sub Connectivity |
-| **Database** | SQLite 3 | Asynchronous Relational Storage |
+| **Database** | SQLite 3 | Lightweight Relational Storage |
 
 ---
 
