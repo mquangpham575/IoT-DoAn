@@ -17,7 +17,7 @@ switch ($Action) {
     "deploy" {
         Write-Host "📦 Packaging and Syncing Integrated IoT Stack to $IP..." -ForegroundColor Magenta
         # Create a temporary tarball, excluding large/unnecessary folders
-        tar --exclude=./.git --exclude=./__pycache__ --exclude=./firmware --exclude=./mobile --exclude=./docs --exclude=./deploy_iot.ps1 --exclude=./iot_project.tar.gz -czf iot_project.tar.gz .
+        tar --exclude=./.git --exclude=./__pycache__ --exclude=./firmware --exclude=./mobile --exclude=./docs --exclude=./backend/data --exclude=./deploy_iot.ps1 --exclude=./iot_project.tar.gz -czf iot_project.tar.gz .
 
         # Create remote directory and upload
         ssh -i $SSH_KEY "$User@$IP" "sudo mkdir -p $RemotePath && sudo chown ${User}:${User} $RemotePath"
