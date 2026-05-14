@@ -614,7 +614,7 @@
             Light mode
           </button>
           <button class="secondary" onclick="refreshNow()">Refresh</button>
-          <button onclick="exportCSV()">Export CSV</button>
+          <button onclick="exportExcel()">Export Excel</button>
         </div>
       </header>
 
@@ -1065,7 +1065,7 @@
         }
       }
 
-      function exportCSV() {
+      function exportExcel() {
         if (!cachedRows.length) return;
 
         const header = [
@@ -1082,26 +1082,48 @@
           "recommendation",
         ];
 
-        const csvRows = cachedRows.map((row) => {
-          return header
-            .map((key) => {
-              let value = row[key];
-              if (Array.isArray(value)) value = value.join(" | ");
-              value = String(value ?? "").replaceAll('"', '""');
-              return `"${value}"`;
-            })
-            .join(",");
+        let tableHtml =
+          '<html xmlns:x="urn:schemas-microsoft-com:office:excel">';
+        tableHtml +=
+          '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Data</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
+        tableHtml +=
+          '<body><table border="1" style="border-collapse: collapse;">';
+
+        // Header
+        tableHtml +=
+          "<tr>" +
+          header
+            .map(
+              (h) =>
+                `<th style="background-color: #e0e0e0; font-weight: bold;">${h}</th>`,
+            )
+            .join("") +
+          "</tr>";
+
+        // Rows
+        cachedRows.forEach((row) => {
+          tableHtml += "<tr>";
+          header.forEach((key) => {
+            let value = row[key];
+            if (Array.isArray(value)) value = value.join(" | ");
+            value = escapeHtml(value ?? "");
+            tableHtml += `<td>${value}</td>`;
+          });
+          tableHtml += "</tr>";
         });
 
-        const csv = [header.join(","), ...csvRows].join("\n");
-        const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csv], {
-          type: "text/csv;charset=utf-8",
+        tableHtml += "</table></body></html>";
+
+        const blob = new Blob([tableHtml], {
+          type: "application/vnd.ms-excel;charset=utf-8",
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "iot_edge_dashboard_export.csv";
+        a.download = "iot_edge_dashboard_export.xls";
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
 
