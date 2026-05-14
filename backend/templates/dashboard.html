@@ -1,889 +1,1039 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IoT Health Monitoring | Edge Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2310b981' stroke-width='8'/><path d='M25 50 L40 50 L45 35 L55 65 L60 50 L75 50' fill='none' stroke='%2310b981' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --card: #1e293b;
-      --card-soft: #172033;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --blue: #3b82f6;
-      --green: #10b981;
-      --yellow: #f59e0b;
-      --red: #ef4444;
-      --purple: #a855f7;
-      --cyan: #06b6d4;
-      --shadow: rgba(0, 0, 0, 0.22);
-      --page-gradient-1: rgba(59, 130, 246, 0.16);
-      --page-gradient-2: rgba(16, 185, 129, 0.12);
-      --card-gradient-top: rgba(30, 41, 59, 0.94);
-      --card-gradient-bottom: rgba(17, 24, 39, 0.94);
-      --inner-bg: rgba(15, 23, 42, 0.38);
-      --button-secondary: rgba(148, 163, 184, 0.12);
-      --chart-grid: rgba(148, 163, 184, 0.14);
-    }
-
-    body.light-theme {
-      --bg: #f8fafc;
-      --panel: #ffffff;
-      --card: #ffffff;
-      --card-soft: #f1f5f9;
-      --border: #cbd5e1;
-      --text: #0f172a;
-      --muted: #475569;
-      --blue: #2563eb;
-      --green: #059669;
-      --yellow: #d97706;
-      --red: #dc2626;
-      --purple: #7c3aed;
-      --cyan: #0891b2;
-      --shadow: rgba(15, 23, 42, 0.10);
-      --page-gradient-1: rgba(37, 99, 235, 0.10);
-      --page-gradient-2: rgba(5, 150, 105, 0.09);
-      --card-gradient-top: rgba(255, 255, 255, 0.98);
-      --card-gradient-bottom: rgba(248, 250, 252, 0.98);
-      --inner-bg: rgba(241, 245, 249, 0.82);
-      --button-secondary: rgba(15, 23, 42, 0.05);
-      --chart-grid: rgba(71, 85, 105, 0.16);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: "Inter", sans-serif;
-    }
-
-    body {
-      background: radial-gradient(circle at top left, var(--page-gradient-1), transparent 32%),
-                  radial-gradient(circle at top right, var(--page-gradient-2), transparent 32%),
-                  var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 24px;
-      transition: background 0.25s ease, color 0.25s ease;
-    }
-
-    .page {
-      max-width: 1520px;
-      margin: 0 auto;
-    }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .title-block h1 {
-      font-size: 28px;
-      line-height: 1.2;
-      font-weight: 800;
-      margin-bottom: 6px;
-      letter-spacing: -0.03em;
-    }
-
-    .title-block p {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--border);
-      background: var(--button-secondary);
-      padding: 9px 12px;
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .badge .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--yellow);
-      box-shadow: 0 0 12px currentColor;
-    }
-
-    .badge.ok {
-      color: var(--green);
-      border-color: rgba(16, 185, 129, 0.35);
-      background: rgba(16, 185, 129, 0.08);
-    }
-
-    .badge.ok .dot {
-      background: var(--green);
-    }
-
-    .badge.err {
-      color: var(--red);
-      border-color: rgba(239, 68, 68, 0.35);
-      background: rgba(239, 68, 68, 0.08);
-    }
-
-    .badge.err .dot {
-      background: var(--red);
-    }
-
-    button {
-      border: 0;
-      border-radius: 10px;
-      padding: 10px 13px;
-      background: var(--blue);
-      color: #fff;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.15s ease, opacity 0.15s ease, background 0.2s ease, color 0.2s ease;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      opacity: 0.92;
-    }
-
-    button.secondary {
-      background: var(--button-secondary);
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
-
-    .theme-toggle {
-      min-width: 118px;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: 1.25fr 0.75fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .hero-card,
-    .recommendation-card,
-    .card,
-    .panel {
-      background: linear-gradient(180deg, var(--card-gradient-top), var(--card-gradient-bottom));
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 20px 60px var(--shadow);
-      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-    }
-
-    .hero-card {
-      padding: 22px;
-      display: grid;
-      grid-template-columns: minmax(220px, 0.8fr) 1.2fr;
-      gap: 20px;
-      min-height: 240px;
-    }
-
-    .status-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 800;
-      border-radius: 999px;
-      padding: 8px 12px;
-      margin-bottom: 14px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      background: rgba(148, 163, 184, 0.08);
-    }
-
-    .status-label.normal {
-      color: var(--green);
-      border-color: rgba(16, 185, 129, 0.35);
-      background: rgba(16, 185, 129, 0.08);
-    }
-
-    .status-label.warning {
-      color: var(--yellow);
-      border-color: rgba(245, 158, 11, 0.35);
-      background: rgba(245, 158, 11, 0.08);
-    }
-
-    .status-label.critical {
-      color: var(--red);
-      border-color: rgba(239, 68, 68, 0.35);
-      background: rgba(239, 68, 68, 0.08);
-    }
-
-    .status-label.critical {
-      color: var(--red);
-      border-color: rgba(239, 68, 68, 0.35);
-      background: rgba(239, 68, 68, 0.08);
-    }
-
-    .risk-number {
-      font-size: 64px;
-      line-height: 1;
-      font-weight: 800;
-      letter-spacing: -0.06em;
-      margin-bottom: 8px;
-    }
-
-    .risk-subtitle {
-      color: var(--muted);
-      font-size: 14px;
-      margin-bottom: 18px;
-    }
-
-    .risk-bar {
-      width: 100%;
-      height: 12px;
-      background: rgba(148, 163, 184, 0.16);
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.18);
-    }
-
-    .risk-fill {
-      width: 0%;
-      height: 100%;
-      background: var(--green);
-      transition: width 0.3s ease, background 0.3s ease;
-    }
-
-    .reason-box {
-      background: var(--inner-bg);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 14px;
-      padding: 16px;
-      height: 100%;
-    }
-
-    .section-title {
-      font-size: 13px;
-      color: var(--muted);
-      text-transform: uppercase;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      margin-bottom: 12px;
-    }
-
-    .reason-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .reason-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.45;
-    }
-
-    .reason-item::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      margin-top: 6px;
-      flex: 0 0 auto;
-      border-radius: 50%;
-      background: var(--yellow);
-    }
-
-    .recommendation-card {
-      padding: 22px;
-      min-height: 240px;
-    }
-
-    .recommendation-text {
-      color: var(--text);
-      font-size: 16px;
-      line-height: 1.7;
-    }
-
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .meta {
-      background: var(--inner-bg);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      border-radius: 12px;
-      padding: 11px;
-    }
-
-    .meta span {
-      display: block;
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 4px;
-    }
-
-    .meta strong {
-      color: var(--text);
-      font-size: 13px;
-    }
-
-    .sensor-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-
-    .card {
-      padding: 17px;
-    }
-
-    .card-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    .sensor-value {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-    }
-
-    .sensor-unit {
-      color: var(--muted);
-      font-size: 13px;
-      margin-left: 4px;
-      font-weight: 600;
-    }
-
-    .sensor-note {
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 8px;
-    }
-
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .panel {
-      padding: 18px;
-      min-height: 360px;
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
-      margin-bottom: 14px;
-    }
-
-    .panel-header h2 {
-      font-size: 15px;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: var(--blue);
-    }
-
-    .panel-header span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .chart-wrap {
-      height: 280px;
-      position: relative;
-    }
-
-    .full {
-      grid-column: 1 / -1;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 960px;
-    }
-
-    th, td {
-      padding: 12px 10px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-      text-align: left;
-      font-size: 13px;
-      vertical-align: top;
-    }
-
-    th {
-      color: var(--muted);
-      text-transform: uppercase;
-      font-size: 11px;
-      letter-spacing: 0.04em;
-      font-weight: 800;
-    }
-
-    td {
-      color: var(--text);
-    }
-
-    .pill {
-      display: inline-flex;
-      border-radius: 999px;
-      padding: 5px 9px;
-      font-size: 11px;
-      font-weight: 800;
-      border: 1px solid var(--border);
-      color: var(--muted);
-    }
-
-    .pill.normal {
-      color: var(--green);
-      border-color: rgba(16, 185, 129, 0.35);
-      background: rgba(16, 185, 129, 0.08);
-    }
-
-    .pill.warning {
-      color: var(--yellow);
-      border-color: rgba(245, 158, 11, 0.35);
-      background: rgba(245, 158, 11, 0.08);
-    }
-
-    .pill.critical {
-      color: var(--red);
-      border-color: rgba(239, 68, 68, 0.35);
-      background: rgba(239, 68, 68, 0.08);
-    }
-
-    .empty {
-      color: var(--muted);
-      text-align: center;
-      padding: 36px 0;
-      font-size: 14px;
-    }
-
-    @media (max-width: 1200px) {
-      .summary-grid,
-      .main-grid,
-      .hero-card {
-        grid-template-columns: 1fr;
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>IoT Health Monitoring | Edge Dashboard</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2310b981' stroke-width='8'/><path d='M25 50 L40 50 L45 35 L55 65 L60 50 L75 50' fill='none' stroke='%2310b981' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --card: #1e293b;
+        --card-soft: #172033;
+        --border: #334155;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --blue: #3b82f6;
+        --green: #10b981;
+        --yellow: #f59e0b;
+        --red: #ef4444;
+        --purple: #a855f7;
+        --cyan: #06b6d4;
+        --shadow: rgba(0, 0, 0, 0.22);
+        --page-gradient-1: rgba(59, 130, 246, 0.16);
+        --page-gradient-2: rgba(16, 185, 129, 0.12);
+        --card-gradient-top: rgba(30, 41, 59, 0.94);
+        --card-gradient-bottom: rgba(17, 24, 39, 0.94);
+        --inner-bg: rgba(15, 23, 42, 0.38);
+        --button-secondary: rgba(148, 163, 184, 0.12);
+        --chart-grid: rgba(148, 163, 184, 0.14);
       }
 
-      .sensor-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      body.light-theme {
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --card: #ffffff;
+        --card-soft: #f1f5f9;
+        --border: #cbd5e1;
+        --text: #0f172a;
+        --muted: #475569;
+        --blue: #2563eb;
+        --green: #059669;
+        --yellow: #d97706;
+        --red: #dc2626;
+        --purple: #7c3aed;
+        --cyan: #0891b2;
+        --shadow: rgba(15, 23, 42, 0.1);
+        --page-gradient-1: rgba(37, 99, 235, 0.1);
+        --page-gradient-2: rgba(5, 150, 105, 0.09);
+        --card-gradient-top: rgba(255, 255, 255, 0.98);
+        --card-gradient-bottom: rgba(248, 250, 252, 0.98);
+        --inner-bg: rgba(241, 245, 249, 0.82);
+        --button-secondary: rgba(15, 23, 42, 0.05);
+        --chart-grid: rgba(71, 85, 105, 0.16);
       }
-    }
 
-    @media (max-width: 720px) {
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", sans-serif;
+      }
+
       body {
-        padding: 14px;
+        background:
+          radial-gradient(
+            circle at top left,
+            var(--page-gradient-1),
+            transparent 32%
+          ),
+          radial-gradient(
+            circle at top right,
+            var(--page-gradient-2),
+            transparent 32%
+          ),
+          var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 24px;
+        transition:
+          background 0.25s ease,
+          color 0.25s ease;
+      }
+
+      .page {
+        max-width: 1520px;
+        margin: 0 auto;
       }
 
       .topbar {
-        flex-direction: column;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .title-block h1 {
+        font-size: 28px;
+        line-height: 1.2;
+        font-weight: 800;
+        margin-bottom: 6px;
+        letter-spacing: -0.03em;
+      }
+
+      .title-block p {
+        color: var(--muted);
+        font-size: 14px;
       }
 
       .actions {
-        justify-content: flex-start;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
       }
 
-      .sensor-grid {
-        grid-template-columns: 1fr;
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        background: var(--button-secondary);
+        padding: 9px 12px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--yellow);
+        box-shadow: 0 0 12px currentColor;
+      }
+
+      .badge.ok {
+        color: var(--green);
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .badge.ok .dot {
+        background: var(--green);
+      }
+
+      .badge.err {
+        color: var(--red);
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
+      }
+
+      .badge.err .dot {
+        background: var(--red);
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 13px;
+        background: var(--blue);
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          opacity 0.15s ease,
+          background 0.2s ease,
+          color 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        opacity: 0.92;
+      }
+
+      button.secondary {
+        background: var(--button-secondary);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      .theme-toggle {
+        min-width: 118px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: 1.25fr 0.75fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .hero-card,
+      .recommendation-card,
+      .card,
+      .panel {
+        background: linear-gradient(
+          180deg,
+          var(--card-gradient-top),
+          var(--card-gradient-bottom)
+        );
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px var(--shadow);
+        transition:
+          background 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
+      }
+
+      .hero-card {
+        padding: 22px;
+        display: grid;
+        grid-template-columns: minmax(220px, 0.8fr) 1.2fr;
+        gap: 20px;
+        min-height: 240px;
+      }
+
+      .status-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 800;
+        border-radius: 999px;
+        padding: 8px 12px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        background: rgba(148, 163, 184, 0.08);
+      }
+
+      .status-label.normal {
+        color: var(--green);
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .status-label.warning {
+        color: var(--yellow);
+        border-color: rgba(245, 158, 11, 0.35);
+        background: rgba(245, 158, 11, 0.08);
+      }
+
+      .status-label.critical {
+        color: var(--red);
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
+      }
+
+      .status-label.critical {
+        color: var(--red);
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
       }
 
       .risk-number {
-        font-size: 54px;
+        font-size: 64px;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: -0.06em;
+        margin-bottom: 8px;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <div class="page">
-    <header class="topbar">
-      <div class="title-block">
-        <h1>IoT Health & Environmental Comfort Dashboard</h1>
-        <p>Backend Edge Logic · Real-time Sensor Monitoring · SQLite Storage · API Integration</p>
-      </div>
+      .risk-subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 18px;
+      }
 
-      <div class="actions">
-        <div class="badge" id="server-badge"><span class="dot"></span><span id="server-status">SERVER: CHECKING</span></div>
-        <div class="badge" id="device-badge"><span class="dot"></span><span id="device-status">DEVICE: CHECKING</span></div>
-        <button class="secondary theme-toggle" id="theme-toggle" onclick="toggleTheme()">Light mode</button>
-        <button class="secondary" onclick="refreshNow()">Refresh</button>
-        <button onclick="exportCSV()">Export CSV</button>
-      </div>
-    </header>
+      .risk-bar {
+        width: 100%;
+        height: 12px;
+        background: rgba(148, 163, 184, 0.16);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
 
-    <section class="summary-grid">
-      <div class="hero-card">
-        <div>
-          <div class="status-label" id="status-label">WAITING</div>
-          <div class="risk-number" id="risk-score">--</div>
-          <div class="risk-subtitle">Risk score / 100 calculated by backend edge logic</div>
-          <div class="risk-bar"><div class="risk-fill" id="risk-fill"></div></div>
-        </div>
+      .risk-fill {
+        width: 0%;
+        height: 100%;
+        background: var(--green);
+        transition:
+          width 0.3s ease,
+          background 0.3s ease;
+      }
 
-        <div class="reason-box">
-          <div class="section-title">Detected reasons</div>
-          <div class="reason-list" id="reason-list">
-            <div class="reason-item">Waiting for sensor data...</div>
-          </div>
-        </div>
-      </div>
+      .reason-box {
+        background: var(--inner-bg);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 14px;
+        padding: 16px;
+        height: 100%;
+      }
 
-      <div class="recommendation-card">
-        <div class="section-title">Backend recommendation</div>
-        <div class="recommendation-text" id="recommendation">
-          Waiting for backend assessment...
-        </div>
+      .section-title {
+        font-size: 13px;
+        color: var(--muted);
+        text-transform: uppercase;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        margin-bottom: 12px;
+      }
 
-        <div class="meta-grid">
-          <div class="meta">
-            <span>Device</span>
-            <strong id="device-id">--</strong>
-          </div>
-          <div class="meta">
-            <span>Last update</span>
-            <strong id="last-update">--</strong>
-          </div>
-          <div class="meta">
-            <span>Processing</span>
-            <strong>Rule-based Edge</strong>
-          </div>
-          <div class="meta">
-            <span>Data source</span>
-            <strong>ESP32 / Simulator</strong>
-          </div>
-        </div>
-      </div>
-    </section>
+      .reason-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
 
-    <section class="sensor-grid">
-      <div class="card">
-        <div class="card-head"><span>Temperature</span><span>°C</span></div>
-        <div><span class="sensor-value" id="temperature">--</span><span class="sensor-unit">°C</span></div>
-        <div class="sensor-note">Thermal comfort indicator</div>
-      </div>
+      .reason-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+      }
 
-      <div class="card">
-        <div class="card-head"><span>Humidity</span><span>%</span></div>
-        <div><span class="sensor-value" id="humidity">--</span><span class="sensor-unit">%</span></div>
-        <div class="sensor-note">Indoor moisture level</div>
-      </div>
+      .reason-item::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        margin-top: 6px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: var(--yellow);
+      }
 
-      <div class="card">
-        <div class="card-head"><span>Gas / MQ135</span><span>raw</span></div>
-        <div><span class="sensor-value" id="gas">--</span><span class="sensor-unit">ppm</span></div>
-        <div class="sensor-note">Air quality approximation</div>
-      </div>
+      .recommendation-card {
+        padding: 22px;
+        min-height: 240px;
+      }
 
-      <div class="card">
-        <div class="card-head"><span>Light</span><span>lux</span></div>
-        <div><span class="sensor-value" id="light">--</span><span class="sensor-unit">lux</span></div>
-        <div class="sensor-note">Illumination condition</div>
-      </div>
+      .recommendation-text {
+        color: var(--text);
+        font-size: 16px;
+        line-height: 1.7;
+      }
 
-      <div class="card">
-        <div class="card-head"><span>Noise</span><span>raw</span></div>
-        <div><span class="sensor-value" id="noise">--</span><span class="sensor-unit">raw</span></div>
-        <div class="sensor-note">Sound level index</div>
-      </div>
-    </section>
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 20px;
+      }
 
-    <section class="main-grid">
-      <div class="panel">
-        <div class="panel-header">
-          <h2>Environment Trends</h2>
-          <span>Temperature / Humidity</span>
-        </div>
-        <div class="chart-wrap"><canvas id="env-chart"></canvas></div>
-      </div>
+      .meta {
+        background: var(--inner-bg);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 12px;
+        padding: 11px;
+      }
 
-      <div class="panel">
-        <div class="panel-header">
-          <h2>Risk & Air Quality</h2>
-          <span>Risk score / Gas</span>
-        </div>
-        <div class="chart-wrap"><canvas id="risk-chart"></canvas></div>
-      </div>
+      .meta span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
 
-      <div class="panel full">
-        <div class="panel-header">
-          <h2>Recent Sensor Readings</h2>
-          <span id="row-count">0 records</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Device</th>
-                <th>Status</th>
-                <th>Risk</th>
-                <th>Temp</th>
-                <th>Humid</th>
-                <th>Gas</th>
-                <th>Light</th>
-                <th>Noise</th>
-                <th>Reasons</th>
-              </tr>
-            </thead>
-            <tbody id="history-body">
-              <tr><td colspan="10" class="empty">Waiting for data...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  </div>
+      .meta strong {
+        color: var(--text);
+        font-size: 13px;
+      }
 
-  <script>
-    let cachedRows = [];
+      .sensor-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
 
-    function getCssValue(name) {
-      return getComputedStyle(document.body).getPropertyValue(name).trim();
-    }
+      .card {
+        padding: 17px;
+      }
 
-    function getTheme() {
-      return localStorage.getItem("iot_dashboard_theme") || "dark";
-    }
+      .card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
 
-    function applyTheme(theme) {
-      document.body.classList.toggle("light-theme", theme === "light");
-      localStorage.setItem("iot_dashboard_theme", theme);
+      .sensor-value {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
 
-      const toggle = document.getElementById("theme-toggle");
-      toggle.textContent = theme === "light" ? "Dark mode" : "Light mode";
+      .sensor-unit {
+        color: var(--muted);
+        font-size: 13px;
+        margin-left: 4px;
+        font-weight: 600;
+      }
 
-      updateChartTheme();
-    }
+      .sensor-note {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 8px;
+      }
 
-    function toggleTheme() {
-      const next = document.body.classList.contains("light-theme") ? "dark" : "light";
-      applyTheme(next);
-    }
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
 
-    Chart.defaults.font.family = "Inter";
+      .panel {
+        padding: 18px;
+        min-height: 360px;
+      }
 
-    const envChart = new Chart(document.getElementById("env-chart"), {
-      type: "line",
-      data: {
-        labels: [],
-        datasets: [
-          { label: "Temperature", data: [], borderColor: "#3b82f6", backgroundColor: "rgba(59, 130, 246, 0.08)", tension: 0.35, pointRadius: 2, borderWidth: 2 },
-          { label: "Humidity", data: [], borderColor: "#a855f7", backgroundColor: "rgba(168, 85, 247, 0.08)", tension: 0.35, pointRadius: 2, borderWidth: 2 }
-        ]
-      },
-      options: chartOptions()
-    });
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+      }
 
-    const riskChart = new Chart(document.getElementById("risk-chart"), {
-      type: "line",
-      data: {
-        labels: [],
-        datasets: [
-          { label: "Risk Score", data: [], borderColor: "#ef4444", backgroundColor: "rgba(239, 68, 68, 0.08)", tension: 0.35, pointRadius: 2, borderWidth: 2, yAxisID: "y" },
-          { label: "Gas", data: [], borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.08)", tension: 0.35, pointRadius: 2, borderWidth: 2, yAxisID: "y1" }
-        ]
-      },
-      options: riskChartOptions()
-    });
+      .panel-header h2 {
+        font-size: 15px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--blue);
+      }
 
-    function chartOptions() {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: { legend: { labels: { usePointStyle: true } } },
-        scales: {
-          x: { grid: { display: false } },
-          y: { grid: { color: getCssValue("--chart-grid") } }
+      .panel-header span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chart-wrap {
+        height: 280px;
+        position: relative;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 600px;
+      }
+
+      th,
+      td {
+        padding: 12px 10px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        text-align: left;
+        font-size: 13px;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        font-weight: 800;
+      }
+
+      td {
+        color: var(--text);
+      }
+
+      .pill {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 5px 9px;
+        font-size: 11px;
+        font-weight: 800;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      .pill.normal {
+        color: var(--green);
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .pill.warning {
+        color: var(--yellow);
+        border-color: rgba(245, 158, 11, 0.35);
+        background: rgba(245, 158, 11, 0.08);
+      }
+
+      .pill.critical {
+        color: var(--red);
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
+      }
+
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 36px 0;
+        font-size: 14px;
+      }
+
+      @media (max-width: 1200px) {
+        .summary-grid,
+        .main-grid,
+        .hero-card {
+          grid-template-columns: 1fr;
         }
-      };
-    }
 
-    function riskChartOptions() {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: { legend: { labels: { usePointStyle: true } } },
-        scales: {
-          x: { grid: { display: false } },
-          y: { min: 0, max: 100, grid: { color: getCssValue("--chart-grid") } },
-          y1: { position: "right", grid: { drawOnChartArea: false }, ticks: { color: getCssValue("--yellow") } }
+        .sensor-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-      };
-    }
+      }
 
-    function updateChartTheme() {
-      const textColor = getCssValue("--muted");
-      const gridColor = getCssValue("--chart-grid");
+      @media (max-width: 720px) {
+        body {
+          padding: 10px;
+        }
 
-      Chart.defaults.color = textColor;
+        .topbar {
+          flex-direction: column;
+        }
 
-      [envChart, riskChart].forEach(chart => {
-        chart.options.plugins.legend.labels.color = textColor;
-        Object.values(chart.options.scales).forEach(scale => {
-          if (scale.ticks) scale.ticks.color = textColor;
-          if (scale.grid && scale.grid.color !== undefined) scale.grid.color = gridColor;
-        });
-        chart.update("none");
+        .actions {
+          justify-content: flex-start;
+        }
+
+        .sensor-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .risk-number {
+          font-size: 54px;
+        }
+
+        .chart-wrap {
+          height: 200px;
+        }
+
+        table {
+          min-width: 100%;
+        }
+
+        th,
+        td {
+          padding: 8px 4px;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="title-block">
+          <h1>IoT Health & Environmental Comfort Dashboard</h1>
+          <p>
+            Backend Edge Logic · Real-time Sensor Monitoring · SQLite Storage ·
+            API Integration
+          </p>
+        </div>
+
+        <div class="actions">
+          <div class="badge" id="server-badge">
+            <span class="dot"></span
+            ><span id="server-status">SERVER: CHECKING</span>
+          </div>
+          <div class="badge" id="device-badge">
+            <span class="dot"></span
+            ><span id="device-status">DEVICE: CHECKING</span>
+          </div>
+          <button
+            class="secondary theme-toggle"
+            id="theme-toggle"
+            onclick="toggleTheme()"
+          >
+            Light mode
+          </button>
+          <button class="secondary" onclick="refreshNow()">Refresh</button>
+          <button onclick="exportCSV()">Export CSV</button>
+        </div>
+      </header>
+
+      <section class="summary-grid">
+        <div class="hero-card">
+          <div>
+            <div class="status-label" id="status-label">WAITING</div>
+            <div class="risk-number" id="risk-score">--</div>
+            <div class="risk-subtitle">
+              Risk score / 100 calculated by backend edge logic
+            </div>
+            <div class="risk-bar">
+              <div class="risk-fill" id="risk-fill"></div>
+            </div>
+          </div>
+
+          <div class="reason-box">
+            <div class="section-title">Detected reasons</div>
+            <div class="reason-list" id="reason-list">
+              <div class="reason-item">Waiting for sensor data...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="recommendation-card">
+          <div class="section-title">Backend recommendation</div>
+          <div class="recommendation-text" id="recommendation">
+            Waiting for backend assessment...
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta">
+              <span>Device</span>
+              <strong id="device-id">--</strong>
+            </div>
+            <div class="meta">
+              <span>Last update</span>
+              <strong id="last-update">--</strong>
+            </div>
+            <div class="meta">
+              <span>Processing</span>
+              <strong>Rule-based Edge</strong>
+            </div>
+            <div class="meta">
+              <span>Data source</span>
+              <strong>ESP32 / Simulator</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sensor-grid">
+        <div class="card">
+          <div class="card-head"><span>Temperature</span><span>°C</span></div>
+          <div>
+            <span class="sensor-value" id="temperature">--</span
+            ><span class="sensor-unit">°C</span>
+          </div>
+          <div class="sensor-note">Thermal comfort indicator</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>Humidity</span><span>%</span></div>
+          <div>
+            <span class="sensor-value" id="humidity">--</span
+            ><span class="sensor-unit">%</span>
+          </div>
+          <div class="sensor-note">Indoor moisture level</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>Gas / MQ135</span><span>raw</span></div>
+          <div>
+            <span class="sensor-value" id="gas">--</span
+            ><span class="sensor-unit">ppm</span>
+          </div>
+          <div class="sensor-note">Air quality approximation</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>Light</span><span>lux</span></div>
+          <div>
+            <span class="sensor-value" id="light">--</span
+            ><span class="sensor-unit">lux</span>
+          </div>
+          <div class="sensor-note">Illumination condition</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>Noise</span><span>raw</span></div>
+          <div>
+            <span class="sensor-value" id="noise">--</span
+            ><span class="sensor-unit">raw</span>
+          </div>
+          <div class="sensor-note">Sound level index</div>
+        </div>
+      </section>
+
+      <section class="main-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Environment Trends</h2>
+            <span>Temperature / Humidity</span>
+          </div>
+          <div class="chart-wrap"><canvas id="env-chart"></canvas></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Risk & Air Quality</h2>
+            <span>Risk score / Gas</span>
+          </div>
+          <div class="chart-wrap"><canvas id="risk-chart"></canvas></div>
+        </div>
+
+        <div class="panel full">
+          <div class="panel-header">
+            <h2>Recent Sensor Readings</h2>
+            <span id="row-count">0 records</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Device</th>
+                  <th>Status</th>
+                  <th>Risk</th>
+                  <th>Temp</th>
+                  <th>Humid</th>
+                  <th>Gas</th>
+                  <th>Light</th>
+                  <th>Noise</th>
+                  <th>Reasons</th>
+                </tr>
+              </thead>
+              <tbody id="history-body">
+                <tr>
+                  <td colspan="10" class="empty">Waiting for data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      let cachedRows = [];
+
+      function getCssValue(name) {
+        return getComputedStyle(document.body).getPropertyValue(name).trim();
+      }
+
+      function getTheme() {
+        return localStorage.getItem("iot_dashboard_theme") || "dark";
+      }
+
+      function applyTheme(theme) {
+        document.body.classList.toggle("light-theme", theme === "light");
+        localStorage.setItem("iot_dashboard_theme", theme);
+
+        const toggle = document.getElementById("theme-toggle");
+        toggle.textContent = theme === "light" ? "Dark mode" : "Light mode";
+
+        updateChartTheme();
+      }
+
+      function toggleTheme() {
+        const next = document.body.classList.contains("light-theme")
+          ? "dark"
+          : "light";
+        applyTheme(next);
+      }
+
+      Chart.defaults.font.family = "Inter";
+
+      const envChart = new Chart(document.getElementById("env-chart"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Temperature",
+              data: [],
+              borderColor: "#3b82f6",
+              backgroundColor: "rgba(59, 130, 246, 0.08)",
+              tension: 0.35,
+              pointRadius: 2,
+              borderWidth: 2,
+            },
+            {
+              label: "Humidity",
+              data: [],
+              borderColor: "#a855f7",
+              backgroundColor: "rgba(168, 85, 247, 0.08)",
+              tension: 0.35,
+              pointRadius: 2,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: chartOptions(),
       });
 
-      riskChart.options.scales.y1.ticks.color = getCssValue("--yellow");
-      riskChart.update("none");
-    }
+      const riskChart = new Chart(document.getElementById("risk-chart"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Risk Score",
+              data: [],
+              borderColor: "#ef4444",
+              backgroundColor: "rgba(239, 68, 68, 0.08)",
+              tension: 0.35,
+              pointRadius: 2,
+              borderWidth: 2,
+              yAxisID: "y",
+            },
+            {
+              label: "Gas",
+              data: [],
+              borderColor: "#f59e0b",
+              backgroundColor: "rgba(245, 158, 11, 0.08)",
+              tension: 0.35,
+              pointRadius: 2,
+              borderWidth: 2,
+              yAxisID: "y1",
+            },
+          ],
+        },
+        options: riskChartOptions(),
+      });
 
-    function statusClass(label) {
-      const lower = String(label || "").toLowerCase();
-      if (lower === "normal") return "normal";
-      if (lower === "critical") return "critical";
-      if (lower === "warning") return "warning";
-      return "";
-    }
-
-    function riskColor(score) {
-      if (score >= 75) return getCssValue("--red");
-      if (score >= 25) return getCssValue("--yellow");
-      return getCssValue("--green");
-    }
-
-    function setServerStatus(isOk) {
-      const badge = document.getElementById("server-badge");
-      const text = document.getElementById("server-status");
-      badge.className = isOk ? "badge ok" : "badge err";
-      text.textContent = isOk ? "SERVER: ONLINE" : "SERVER: OFFLINE";
-    }
-
-    function setDeviceStatus(isOnline) {
-      const badge = document.getElementById("device-badge");
-      const text = document.getElementById("device-status");
-      badge.className = isOnline ? "badge ok" : "badge err";
-      text.textContent = isOnline ? "DEVICE: ONLINE" : "DEVICE: OFFLINE";
-    }
-
-    async function checkHealth() {
-      try {
-        const res = await fetch("/api/v1/system/health");
-        if (!res.ok) throw new Error("Health check failed");
-        const data = await res.json();
-        setServerStatus(true);
-        setDeviceStatus(data.device === "online");
-      } catch (err) {
-        setServerStatus(false);
-        setDeviceStatus(false);
-      }
-    }
-
-    async function fetchHistory() {
-      const res = await fetch("/api/v1/sensor/history?limit=50");
-      if (!res.ok) throw new Error(`History API failed: ${res.status}`);
-      const payload = await res.json();
-      return payload.data || [];
-    }
-
-    function updateLatest(row) {
-      if (!row) return;
-
-      document.getElementById("device-id").textContent = row.device_id || "--";
-      document.getElementById("last-update").textContent = row.created_at || "--";
-
-      document.getElementById("temperature").textContent = Number(row.temperature).toFixed(1);
-      document.getElementById("humidity").textContent = Number(row.humidity).toFixed(1);
-      document.getElementById("gas").textContent = row.gas;
-      document.getElementById("light").textContent = Number(row.light).toFixed(1);
-      document.getElementById("noise").textContent = row.noise;
-
-      const score = Number(row.risk_score || 0);
-      const label = row.status_label || "WAITING";
-      const statusEl = document.getElementById("status-label");
-      statusEl.className = `status-label ${statusClass(label)}`;
-      statusEl.textContent = label;
-
-      document.getElementById("risk-score").textContent = score;
-      const fill = document.getElementById("risk-fill");
-      fill.style.width = `${Math.max(0, Math.min(score, 100))}%`;
-      fill.style.background = riskColor(score);
-
-      document.getElementById("recommendation").textContent = row.recommendation || "No recommendation.";
-
-      const reasons = Array.isArray(row.reasons) ? row.reasons : [];
-      document.getElementById("reason-list").innerHTML = reasons.length
-        ? reasons.map(reason => `<div class="reason-item">${escapeHtml(reason)}</div>`).join("")
-        : `<div class="reason-item">No abnormal indicators detected.</div>`;
-    }
-
-    function updateCharts(rows) {
-      const ordered = [...rows].reverse();
-      const labels = ordered.map(row => String(row.created_at || "").split(" ")[1] || row.created_at);
-
-      envChart.data.labels = labels;
-      envChart.data.datasets[0].data = ordered.map(row => row.temperature);
-      envChart.data.datasets[1].data = ordered.map(row => row.humidity);
-      envChart.update("none");
-
-      riskChart.data.labels = labels;
-      riskChart.data.datasets[0].data = ordered.map(row => row.risk_score);
-      riskChart.data.datasets[1].data = ordered.map(row => row.gas);
-      riskChart.update("none");
-    }
-
-    function updateTable(rows) {
-      const body = document.getElementById("history-body");
-      document.getElementById("row-count").textContent = `${rows.length} records`;
-
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="10" class="empty">No sensor data yet. Run simulator or send POST request.</td></tr>`;
-        return;
+      function chartOptions() {
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend: { labels: { usePointStyle: true } } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: getCssValue("--chart-grid") } },
+          },
+        };
       }
 
-      body.innerHTML = rows.slice(0, 20).map(row => {
-        const cls = statusClass(row.status_label);
-        const reasons = Array.isArray(row.reasons) ? row.reasons.join(" | ") : "";
+      function riskChartOptions() {
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend: { labels: { usePointStyle: true } } },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: getCssValue("--chart-grid") },
+            },
+            y1: {
+              position: "right",
+              grid: { drawOnChartArea: false },
+              ticks: { color: getCssValue("--yellow") },
+            },
+          },
+        };
+      }
+
+      function updateChartTheme() {
+        const textColor = getCssValue("--muted");
+        const gridColor = getCssValue("--chart-grid");
+
+        Chart.defaults.color = textColor;
+
+        [envChart, riskChart].forEach((chart) => {
+          chart.options.plugins.legend.labels.color = textColor;
+          Object.values(chart.options.scales).forEach((scale) => {
+            if (scale.ticks) scale.ticks.color = textColor;
+            if (scale.grid && scale.grid.color !== undefined)
+              scale.grid.color = gridColor;
+          });
+          chart.update("none");
+        });
+
+        riskChart.options.scales.y1.ticks.color = getCssValue("--yellow");
+        riskChart.update("none");
+      }
+
+      function statusClass(label) {
+        const lower = String(label || "").toLowerCase();
+        if (lower === "normal") return "normal";
+        if (lower === "critical") return "critical";
+        if (lower === "warning") return "warning";
+        return "";
+      }
+
+      function riskColor(score) {
+        if (score >= 75) return getCssValue("--red");
+        if (score >= 25) return getCssValue("--yellow");
+        return getCssValue("--green");
+      }
+
+      function setServerStatus(isOk) {
+        const badge = document.getElementById("server-badge");
+        const text = document.getElementById("server-status");
+        badge.className = isOk ? "badge ok" : "badge err";
+        text.textContent = isOk ? "SERVER: ONLINE" : "SERVER: OFFLINE";
+      }
+
+      function setDeviceStatus(isOnline) {
+        const badge = document.getElementById("device-badge");
+        const text = document.getElementById("device-status");
+        badge.className = isOnline ? "badge ok" : "badge err";
+        text.textContent = isOnline ? "DEVICE: ONLINE" : "DEVICE: OFFLINE";
+      }
+
+      async function checkHealth() {
+        try {
+          const res = await fetch("/api/v1/system/health");
+          if (!res.ok) throw new Error("Health check failed");
+          const data = await res.json();
+          setServerStatus(true);
+          setDeviceStatus(data.device === "online");
+        } catch (err) {
+          setServerStatus(false);
+          setDeviceStatus(false);
+        }
+      }
+
+      async function fetchHistory() {
+        const res = await fetch("/api/v1/sensor/history?limit=50");
+        if (!res.ok) throw new Error(`History API failed: ${res.status}`);
+        const payload = await res.json();
+        return payload.data || [];
+      }
+
+      function updateLatest(row) {
+        if (!row) return;
+
+        document.getElementById("device-id").textContent =
+          row.device_id || "--";
+        document.getElementById("last-update").textContent =
+          row.created_at || "--";
+
+        document.getElementById("temperature").textContent = Number(
+          row.temperature,
+        ).toFixed(1);
+        document.getElementById("humidity").textContent = Number(
+          row.humidity,
+        ).toFixed(1);
+        document.getElementById("gas").textContent = row.gas;
+        document.getElementById("light").textContent = Number(
+          row.light,
+        ).toFixed(1);
+        document.getElementById("noise").textContent = row.noise;
+
         const score = Number(row.risk_score || 0);
-        return `
+        const label = row.status_label || "WAITING";
+        const statusEl = document.getElementById("status-label");
+        statusEl.className = `status-label ${statusClass(label)}`;
+        statusEl.textContent = label;
+
+        document.getElementById("risk-score").textContent = score;
+        const fill = document.getElementById("risk-fill");
+        fill.style.width = `${Math.max(0, Math.min(score, 100))}%`;
+        fill.style.background = riskColor(score);
+
+        document.getElementById("recommendation").textContent =
+          row.recommendation || "No recommendation.";
+
+        const reasons = Array.isArray(row.reasons) ? row.reasons : [];
+        document.getElementById("reason-list").innerHTML = reasons.length
+          ? reasons
+              .map(
+                (reason) =>
+                  `<div class="reason-item">${escapeHtml(reason)}</div>`,
+              )
+              .join("")
+          : `<div class="reason-item">No abnormal indicators detected.</div>`;
+      }
+
+      function updateCharts(rows) {
+        const ordered = [...rows].reverse();
+        const labels = ordered.map(
+          (row) => String(row.created_at || "").split(" ")[1] || row.created_at,
+        );
+
+        envChart.data.labels = labels;
+        envChart.data.datasets[0].data = ordered.map((row) => row.temperature);
+        envChart.data.datasets[1].data = ordered.map((row) => row.humidity);
+        envChart.update("none");
+
+        riskChart.data.labels = labels;
+        riskChart.data.datasets[0].data = ordered.map((row) => row.risk_score);
+        riskChart.data.datasets[1].data = ordered.map((row) => row.gas);
+        riskChart.update("none");
+      }
+
+      function updateTable(rows) {
+        const body = document.getElementById("history-body");
+        document.getElementById("row-count").textContent =
+          `${rows.length} records`;
+
+        if (!rows.length) {
+          body.innerHTML = `<tr><td colspan="10" class="empty">No sensor data yet. Run simulator or send POST request.</td></tr>`;
+          return;
+        }
+
+        body.innerHTML = rows
+          .slice(0, 20)
+          .map((row) => {
+            const cls = statusClass(row.status_label);
+            const reasons = Array.isArray(row.reasons)
+              ? row.reasons.join(" | ")
+              : "";
+            const score = Number(row.risk_score || 0);
+            return `
           <tr>
             <td>${escapeHtml(row.created_at || "--")}</td>
             <td>${escapeHtml(row.device_id || "--")}</td>
@@ -897,63 +1047,76 @@
             <td>${escapeHtml(reasons)}</td>
           </tr>
         `;
-      }).join("");
-    }
-
-    async function refreshNow() {
-      try {
-        await checkHealth();
-        const rows = await fetchHistory();
-        cachedRows = rows;
-        updateLatest(rows[0]);
-        updateCharts(rows);
-        updateTable(rows);
-      } catch (err) {
-        console.error(err);
-        setServerStatus(false);
+          })
+          .join("");
       }
-    }
 
-    function exportCSV() {
-      if (!cachedRows.length) return;
+      async function refreshNow() {
+        try {
+          await checkHealth();
+          const rows = await fetchHistory();
+          cachedRows = rows;
+          updateLatest(rows[0]);
+          updateCharts(rows);
+          updateTable(rows);
+        } catch (err) {
+          console.error(err);
+          setServerStatus(false);
+        }
+      }
 
-      const header = [
-        "created_at", "device_id", "status_label", "risk_score",
-        "temperature", "humidity", "gas", "light", "noise",
-        "reasons", "recommendation"
-      ];
+      function exportCSV() {
+        if (!cachedRows.length) return;
 
-      const csvRows = cachedRows.map(row => {
-        return header.map(key => {
-          let value = row[key];
-          if (Array.isArray(value)) value = value.join(" | ");
-          value = String(value ?? "").replaceAll('"', '""');
-          return `"${value}"`;
-        }).join(",");
-      });
+        const header = [
+          "created_at",
+          "device_id",
+          "status_label",
+          "risk_score",
+          "temperature",
+          "humidity",
+          "gas",
+          "light",
+          "noise",
+          "reasons",
+          "recommendation",
+        ];
 
-      const csv = [header.join(","), ...csvRows].join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "iot_edge_dashboard_export.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+        const csvRows = cachedRows.map((row) => {
+          return header
+            .map((key) => {
+              let value = row[key];
+              if (Array.isArray(value)) value = value.join(" | ");
+              value = String(value ?? "").replaceAll('"', '""');
+              return `"${value}"`;
+            })
+            .join(",");
+        });
 
-    function escapeHtml(value) {
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
+        const csv = [header.join(","), ...csvRows].join("\n");
+        const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csv], {
+          type: "text/csv;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "iot_edge_dashboard_export.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
 
-    applyTheme(getTheme());
-    refreshNow();
-    setInterval(refreshNow, 5000);
-  </script>
-</body>
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      applyTheme(getTheme());
+      refreshNow();
+      setInterval(refreshNow, 5000);
+    </script>
+  </body>
 </html>
