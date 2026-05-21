@@ -26,7 +26,7 @@ Khác với hướng tiếp cận “AI-only”, hệ thống ưu tiên **an to�
 - [Chương II. Cơ sở lý thuyết](#chương-ii-cơ-sở-lý-thuyết)
 - [Chương III. Thiết kế hệ thống](#chương-iii-thiết-kế-hệ-thống)
 - [Chương IV. Triển khai hệ thống](#chương-iv-triển-khai-hệ-thống)
-- [Chương V. Kế hoạch demo & đánh giá thực nghiệm (không bịa số liệu)](#chương-v-kế-hoạch-demo--đánh-giá-thực-nghiệm-không-bịa-số-liệu)
+- [Chương V. Kế hoạch demo & đánh giá thực nghiệm](#chương-v-kế-hoạch-demo--đánh-giá-thực-nghiệm-không-bịa-số-liệu)
 - [Kết luận](#kết-luận)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 - [Phụ lục](#phụ-lục)
@@ -214,57 +214,6 @@ Mặc dù repo không tích hợp Prometheus/Grafana, hệ thống vẫn có cá
 - Structured logging (JSON logs) cho pipeline ingest.
 - Metrics nội bộ (counter/timer) cho số reading, lỗi validate, thời gian xử lý.
 
----
-
-## 2.7. Chất lượng dữ liệu cảm biến (Data Quality) và hiệu chỉnh ngưỡng
-
-Trong hệ IoT, độ tin cậy của quyết định phụ thuộc trực tiếp vào chất lượng dữ liệu đầu vào. Các cảm biến phổ biến như MQ135 (khí) và module microphone (noise raw) thường chịu ảnh hưởng bởi:
-
-- Sai số do nhiệt độ/độ ẩm nền, vị trí lắp đặt, thời gian warm-up.
-- Nhiễu điện, nhiễu ADC, dao động nguồn cấp.
-- Trôi (drift) theo thời gian.
-
-Do đó, khi thiết kế rule-based, các ngưỡng trong repo cần được hiểu như **ngưỡng demo/baseline**. Một quy trình hiệu chỉnh ngưỡng tối thiểu nên có:
-
-1. Ghi nhận baseline theo thời gian (ít nhất nhiều phiên đo, nhiều thời điểm trong ngày).
-2. Xác định phân phối (median, percentile) và outliers.
-3. Đặt ngưỡng theo nguyên tắc: ưu tiên giảm false negative cho CRITICAL (an toàn) nhưng cân bằng để không spam.
-4. Kiểm chứng trên bối cảnh phòng/điều kiện cụ thể.
-
-Trong thiết kế hybrid, dữ liệu chất lượng thấp sẽ gây ra hai dạng lỗi:
-
-- **Rule-only false alarm**: một chỉ số nhiễu vượt ngưỡng.
-- **ML false escalation**: ML nhạy với nhiễu cục bộ (nếu không được huấn luyện/cân bằng dữ liệu phù hợp).
-
-## 2.8. Thiết kế hệ thống thời gian thực: sampling, jitter và đồng bộ thời gian
-
-Hệ thống hiện sử dụng chu kỳ gửi dữ liệu 5 giây ở firmware. Trên thực tế, sampling và truyền tải bị ảnh hưởng bởi:
-
-- Jitter từ vòng lặp đọc cảm biến.
-- Độ trễ WiFi/Internet, NAT, container networking.
-- Độ trễ xử lý backend.
-
-Việc đo E2E latency (Chương V) cần tách biệt các thành phần: latency do thiết bị, do mạng, do server, do UI.
-
-Ngoài ra, nếu so sánh timestamp giữa ESP32 và backend, phải lưu ý đồng bộ thời gian (NTP) hoặc chấp nhận sai số; trong đồ án, có thể ưu tiên đo theo timestamp phía backend (server-side) để giảm phụ thuộc đồng hồ thiết bị.
-
-## 2.9. Quan sát hệ thống (Observability) trong bối cảnh đồ án
-
-Mặc dù repo không tích hợp Prometheus/Grafana, hệ thống vẫn có các “điểm quan sát” khả dụng:
-
-- Log backend (docker logs) cho lỗi payload, lỗi MQTT, lỗi Discord.
-- Dữ liệu SQLite như một dạng telemetry history.
-- Health endpoint phản ánh tình trạng DB và heartbeat thiết bị.
-
-Để mở rộng theo hướng “hệ thống hóa đánh giá”, có thể bổ sung:
-
-- Structured logging (JSON logs) cho pipeline ingest.
-- Metrics nội bộ (counter/timer) cho số reading, lỗi validate, thời gian xử lý.
-
----
-
----
-
 # CHƯƠNG III. THIẾT KẾ HỆ THỐNG
 
 ## 3.1. Yêu cầu chức năng
@@ -289,42 +238,7 @@ Mặc dù repo không tích hợp Prometheus/Grafana, hệ thống vẫn có cá
 
 ## 3.3. Kiến trúc tổng thể
 
-### 3.3.1. Mô hình 3 lớp
-
-```mermaid
-flowchart TB
-  subgraph Edge[Edge Layer]
-    ESP[ESP32 + Sensors]
-  end
-
-  subgraph Logic[Logic Layer]
-    API[FastAPI Backend]
-    Hybrid[Hybrid Engine\n(rule-based + RandomForest)]
-    DB[(SQLite)]
-    MQTT[MQTT Subscriber]
-    Disc[Discord Webhook]
-  end
-
-  subgraph UI[Presentation Layer]
-    Dash[Dashboard (Jinja2 + Chart.js)]
-    Mobile[Mobile App (Capacitor) - scaffold]
-  end
-
-  ESP -->|HTTP POST /data or /api/v1/sensor/readings| API
-  ESP -->|MQTT publish iot/<device>/sensor| MQTT
-
-  MQTT --> Hybrid
-  API --> Hybrid
-
-  Hybrid --> DB
-  DB --> API
-
-  Hybrid -->|WARNING/CRITICAL| Disc
-  API --> Dash
-  API --> Mobile
-```
-
-### 3.3.2. Luồng dữ liệu chuẩn hóa
+### 3.3.1. Luồng dữ liệu chuẩn hóa
 
 1. Edge đo cảm biến → tạo JSON payload.
 2. Payload đi qua HTTP hoặc MQTT.
@@ -468,24 +382,6 @@ Giới hạn: `risk_score` được clamp về [0, 100].
 - Ngược lại, nếu `risk_score >= 25` hoặc có lý do bất thường → `WARNING`.
 - Ngược lại → `NORMAL` (kèm lý do tổng quát “trong ngưỡng chấp nhận”).
 
-### 3.7.3. Pseudocode
-
-```text
-input: sensor_data
-risk_score = 0; reasons = []; critical_flag = false
-
-apply thresholds for temperature/humidity/gas/light/noise
-if gas or temperature critical => critical_flag = true
-if len(reasons) >= 3 => risk_score += 10; reasons += ["Multiple abnormal..."]
-risk_score = clamp(risk_score, 0, 100)
-
-if critical_flag or risk_score >= 75 => status=CRITICAL, comfort=2
-else if risk_score >= 25 or reasons not empty => status=WARNING, comfort=1
-else => status=NORMAL, comfort=0; reasons=["All ... acceptable"]
-
-output: comfort_level, status_label, risk_score, reasons
-```
-
 ## 3.8. Thiết kế Hybrid ML + Rule-based
 
 ### 3.8.1. Vai trò ML trong hybrid
@@ -596,69 +492,6 @@ Backend sinh `created_at` theo UTC+7 dưới dạng string. Quy ước này thu�
 
 Trong đánh giá thực nghiệm, cần thống nhất quy ước: hoặc lưu thêm epoch timestamp, hoặc lưu ISO-8601 kèm offset.
 
-## 3.12. Quản trị cấu hình và tham số hệ thống
-
-Thiết kế cấu hình tập trung trong `Settings` giúp:
-
-- Tách secrets và tham số runtime khỏi code.
-- Cho phép chạy cùng code ở local, Docker và cloud bằng việc thay `.env`.
-
-Các nhóm cấu hình chính:
-
-1. **Network**: host/port backend.
-2. **Security**: API key, dashboard token.
-3. **Integration**: Discord webhook, MQTT broker.
-4. **Operational**: cooldown seconds, topic wildcard.
-
-Nguyên tắc vận hành đề xuất:
-
-- Không commit `.env` và không commit webhook URL thật.
-- Đổi key/token trước khi demo công khai.
-- Nếu chạy cloud, cân nhắc firewall cho port 1883 (MQTT) và 8000 (HTTP).
-
-## 3.13. Quản trị lỗi và nguyên tắc “không sập hệ thống”
-
-Một hệ thống ingest sensor phải xử lý được payload lỗi mà không làm backend bị sập. Repo hiện áp dụng:
-
-- Với MQTT: bắt lỗi JSON decode, schema validation, lỗi runtime và chỉ log.
-- Với Discord: bắt lỗi network/HTTP >=400 và trả trạng thái gửi thất bại.
-
-Các failure mode cần thảo luận khi mở rộng:
-
-- Broker mất kết nối: cần reconnect strategy và backoff.
-- Discord webhook bị rate-limit: cần retry có kiểm soát và queue.
-- DB file lock (SQLite) khi concurrency tăng: cân nhắc WAL mode hoặc migrate DB.
-
-## 3.14. Mở rộng multi-device và định danh thiết bị
-
-Thiết kế hiện hỗ trợ đa thiết bị ở mức hợp đồng dữ liệu:
-
-- HTTP/MQTT payload có `device_id`.
-- MQTT topic wildcard `iot/+/sensor`.
-
-Để mở rộng đúng chuẩn, cần bổ sung “device registry” tối thiểu:
-
-- Danh sách thiết bị hợp lệ, thông tin vị trí, loại cảm biến.
-- Trạng thái online/offline per device (không chỉ 1 heartbeat toàn app).
-- Chính sách cooldown theo device và theo loại cảnh báo.
-
-## 3.15. Bảo mật và phân quyền truy cập (ở mức thiết kế)
-
-Ở mức đồ án, API key và dashboard token là đủ để demo. Tuy nhiên, khi xem xét production-grade:
-
-- HTTPS/TLS bắt buộc để tránh lộ API key.
-- Token dashboard qua query param dễ bị lộ qua log/history; nên chuyển sang cookie/session hoặc header-based auth.
-- MQTT cần ACL (username/password) và/hoặc TLS.
-
-## 3.16. Quy ước thời gian và timezone
-
-Backend sinh `created_at` theo UTC+7 dưới dạng string. Quy ước này thuận tiện hiển thị dashboard nhưng có hạn chế:
-
-- Không chuẩn hóa theo ISO-8601.
-- Khó phân tích chéo vùng giờ.
-
-Trong đánh giá thực nghiệm, cần thống nhất quy ước: hoặc lưu thêm epoch timestamp, hoặc lưu ISO-8601 kèm offset.
-
 ---
 
 # CHƯƠNG IV. TRIỂN KHAI HỆ THỐNG
@@ -674,23 +507,6 @@ Backend được tổ chức theo mô hình “modular FastAPI”:
 - `app/routers/*`: định nghĩa API endpoints.
 - `app/services/*`: business logic (edge, hybrid, mqtt, discord, notification).
 - `templates/dashboard.html`: dashboard.
-
-### 4.1.1. Bảng phân rã module (module decomposition)
-
-| Nhóm     | Thành phần           | Trách nhiệm                                               | Ghi chú                             |
-| -------- | -------------------- | --------------------------------------------------------- | ----------------------------------- |
-| Routers  | sensor_router        | Ingest + query latest/history + legacy endpoints          | Tích hợp cập nhật heartbeat         |
-| Routers  | dashboard_router     | Render dashboard HTML + token check                       | Presentation                        |
-| Routers  | system_router        | Health check DB + device heartbeat                        | Device heartbeat hiện theo app-wide |
-| Services | edge_service         | Rule-based scoring + reasons                              | Nguồn `risk_score`                  |
-| Services | comfort_service      | Orchestrate hybrid rule + ML + recommendation + timestamp | ML có thể escalate                  |
-| Services | mqtt_service         | Subscribe + decode/validate + persist + notify            | Resilient to bad payload            |
-| Services | notification_service | Cooldown + dispatch Discord                               | Anti-spam                           |
-| Services | discord_service      | Webhook HTTP POST to Discord                              | Embed payload                       |
-| Services | alert_service        | Human-centered recommendation                             | Dựa trên reasons                    |
-| Storage  | database             | SQLite init/insert/query                                  | `reasons` lưu JSON string           |
-
-Mục đích của bảng này là giúp thuyết minh rõ “ai làm gì” và hỗ trợ audit khi kiểm thử.
 
 ### 4.1.1. Bảng phân rã module (module decomposition)
 
@@ -726,60 +542,6 @@ Mục đích của bảng này là giúp thuyết minh rõ “ai làm gì” và
 
 Điểm thiết kế: notification chạy background để giảm latency response.
 
-### 4.2.1. Sơ đồ trình tự (sequence) cho HTTP ingest
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant ESP as ESP32/Simulator
-  participant API as FastAPI Router
-  participant HY as Hybrid Engine
-  participant DB as SQLite
-  participant NT as Notification
-  participant DC as Discord
-
-  ESP->>API: POST /api/v1/sensor/readings (JSON + X-API-KEY)
-  API->>API: Validate API key + schema
-  API->>HY: evaluate_sensor_reading(sensor_data)
-  HY->>HY: rule-based assessment
-  HY-->>HY: optional ML predict + escalate
-  HY->>HY: build_recommendation + created_at
-  API->>DB: insert_sensor_reading(processed)
-  DB-->>API: new id
-  API->>API: update last_seen (heartbeat)
-  API-->>ESP: 200 (processed payload)
-  API-->>NT: background notify_if_needed(processed)
-  NT->>DC: POST webhook (if WARNING/CRITICAL and cooldown pass)
-```
-
-Điểm đáng chú ý trong thiết kế này là tách **đường trả response** khỏi **đường gửi alert**, giúp phản hồi nhanh hơn và hạn chế domino effect khi Discord chậm/lỗi.
-
-### 4.2.1. Sơ đồ trình tự (sequence) cho HTTP ingest
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant ESP as ESP32/Simulator
-  participant API as FastAPI Router
-  participant HY as Hybrid Engine
-  participant DB as SQLite
-  participant NT as Notification
-  participant DC as Discord
-
-  ESP->>API: POST /api/v1/sensor/readings (JSON + X-API-KEY)
-  API->>API: Validate API key + schema
-  API->>HY: evaluate_sensor_reading(sensor_data)
-  HY->>HY: rule-based assessment
-  HY-->>HY: optional ML predict + escalate
-  HY->>HY: build_recommendation + created_at
-  API->>DB: insert_sensor_reading(processed)
-  DB-->>API: new id
-  API->>API: update last_seen (heartbeat)
-  API-->>ESP: 200 (processed payload)
-  API-->>NT: background notify_if_needed(processed)
-  NT->>DC: POST webhook (if WARNING/CRITICAL and cooldown pass)
-```
-
 Điểm đáng chú ý trong thiết kế này là tách **đường trả response** khỏi **đường gửi alert**, giúp phản hồi nhanh hơn và hạn chế domino effect khi Discord chậm/lỗi.
 
 ## 4.3. Pipeline xử lý ingestion (MQTT)
@@ -798,52 +560,6 @@ sequenceDiagram
 Cơ chế chống lỗi:
 
 - Bắt lỗi JSON decode, schema validation, lỗi runtime khác; ghi log và không crash loop.
-
-### 4.3.1. Sơ đồ trình tự (sequence) cho MQTT ingest
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant DEV as Device Publisher
-  participant BR as Mosquitto Broker
-  participant MS as mqtt_service subscriber
-  participant HY as Hybrid Engine
-  participant DB as SQLite
-  participant NT as Notification
-  participant DC as Discord
-
-  DEV->>BR: publish iot/<device_id>/sensor (JSON)
-  BR-->>MS: deliver message
-  MS->>MS: decode JSON + validate schema
-  MS->>HY: evaluate_sensor_reading(sensor_data)
-  HY->>DB: insert_sensor_reading(processed)
-  MS->>NT: notify_if_needed(processed)
-  NT->>DC: POST webhook (if alertable)
-```
-
-Khác với HTTP path, MQTT path hiện gọi notify đồng bộ (không background task). Khi mở rộng tải, có thể cân nhắc tách notification thành async queue để giảm độ trễ xử lý message.
-
-### 4.3.1. Sơ đồ trình tự (sequence) cho MQTT ingest
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant DEV as Device Publisher
-  participant BR as Mosquitto Broker
-  participant MS as mqtt_service subscriber
-  participant HY as Hybrid Engine
-  participant DB as SQLite
-  participant NT as Notification
-  participant DC as Discord
-
-  DEV->>BR: publish iot/<device_id>/sensor (JSON)
-  BR-->>MS: deliver message
-  MS->>MS: decode JSON + validate schema
-  MS->>HY: evaluate_sensor_reading(sensor_data)
-  HY->>DB: insert_sensor_reading(processed)
-  MS->>NT: notify_if_needed(processed)
-  NT->>DC: POST webhook (if alertable)
-```
 
 Khác với HTTP path, MQTT path hiện gọi notify đồng bộ (không background task). Khi mở rộng tải, có thể cân nhắc tách notification thành async queue để giảm độ trễ xử lý message.
 
@@ -879,15 +595,6 @@ Dashboard sử dụng HTML/CSS + Chart.js để hiển thị. Trong phạm vi b�
 
 Khi nâng cấp đánh giá thực nghiệm, dashboard nên hỗ trợ export dữ liệu (CSV/JSON) hoặc cung cấp endpoint riêng để trích xuất artifact phục vụ phân tích.
 
-### 4.5.1. Nhận xét kỹ thuật về dashboard
-
-Dashboard sử dụng HTML/CSS + Chart.js để hiển thị. Trong phạm vi báo cáo, dashboard được xem là công cụ quan sát và kiểm chứng:
-
-- Đối soát dữ liệu backend (latest/history).
-- Kiểm chứng “reasons” và “recommendation” có tính giải thích.
-
-Khi nâng cấp đánh giá thực nghiệm, dashboard nên hỗ trợ export dữ liệu (CSV/JSON) hoặc cung cấp endpoint riêng để trích xuất artifact phục vụ phân tích.
-
 ## 4.6. Firmware ESP32
 
 Firmware thực hiện:
@@ -900,18 +607,6 @@ Firmware thực hiện:
 - Watchdog: reset để tăng độ ổn định.
 
 Ý nghĩa thiết kế: edge alert là “phản ứng tức thời tại chỗ”, trong khi backend tạo đánh giá tổng hợp và khuyến nghị.
-
-### 4.6.1. Bàn luận về mDNS và chiến lược fallback cloud
-
-Firmware thực hiện query service `http/tcp` thông qua mDNS và chọn bản ghi đầu tiên nếu tìm thấy; nếu không, fallback sang Azure public IP. Chiến lược này phù hợp demo vì:
-
-- Khi ở cùng LAN, có thể tìm server nội bộ để giảm latency.
-- Khi không có server nội bộ hoặc demo từ xa, có thể dùng cloud.
-
-Tuy nhiên, để đáng tin cậy hơn khi nhiều dịch vụ http/tcp trong LAN, cần:
-
-- Ràng buộc tên service hoặc TXT record để nhận diện đúng backend.
-- Hoặc cấu hình domain riêng (ví dụ `iot-server.local`).
 
 ### 4.6.1. Bàn luận về mDNS và chiến lược fallback cloud
 
@@ -943,15 +638,6 @@ Backend mount `./backend/data:/app/data` nhằm:
 
 Đây là một quyết định hợp lý cho đồ án. Khi triển khai thật, cần chiến lược backup và quản lý quyền truy cập file DB.
 
-### 4.7.1. Lý do mount volume cho SQLite
-
-Backend mount `./backend/data:/app/data` nhằm:
-
-- Giữ dữ liệu qua lần restart container.
-- Dễ trích xuất DB để phân tích/đánh giá.
-
-Đây là một quyết định hợp lý cho đồ án. Khi triển khai thật, cần chiến lược backup và quản lý quyền truy cập file DB.
-
 ## 4.8. Triển khai lên Azure VM
 
 Script `deploy_iot.ps1`:
@@ -971,118 +657,24 @@ Tuy nhiên, nếu cần phục vụ “thu thập artifact đánh giá” trên 
 - Lưu riêng thư mục `results/` hoặc `artifacts/` trên VM.
 - Không xóa dữ liệu khi redeploy.
 
-### 4.8.1. Nhận xét về packaging/exclude
-
-Script deploy exclude các thư mục lớn hoặc không cần cho runtime (docs, firmware, mobile, data). Điều này giảm thời gian upload và tránh ghi đè dữ liệu runtime.
-
-Tuy nhiên, nếu cần phục vụ “thu thập artifact đánh giá” trên cloud, nên cân nhắc:
-
-- Lưu riêng thư mục `results/` hoặc `artifacts/` trên VM.
-- Không xóa dữ liệu khi redeploy.
-
 ---
 
-# CHƯƠNG V. KẾ HOẠCH DEMO & ĐÁNH GIÁ THỰC NGHIỆM (KHÔNG BỊA SỐ LIỆU)
-
-> Ghi chú: Repo hiện chưa lưu các artifact benchmark định lượng (csv, summary). Vì vậy chương này trình bày **phương pháp đo** và **giao thức thí nghiệm** để nhóm có thể chạy và điền số liệu sau.
+# CHƯƠNG V. KẾ HOẠCH DEMO & ĐÁNH GIÁ THỰC NGHIỆM
 
 ## 5.1. Câu hỏi nghiên cứu và giả thuyết
 
 - **RQ1**: Rule-based assessment có phân loại đúng theo bảng ngưỡng không?
-  - **H1**: Với các test-case biên (boundary cases), status_label khớp với kỳ vọng theo luật.
+  - **H1**: Với các dữ liệu đo từ cảm biến thật, status_label khớp chính xác với kỳ vọng phân loại theo luật cứng.
 
 - **RQ2**: Hybrid ML có giúp phát hiện bất thường ở vùng cận ngưỡng không?
-  - **H2**: Trên dữ liệu thật (được gán nhãn), hybrid giảm false negative so với rule-only.
+  - **H2**: Mô hình RandomForest có khả năng leo thang mức cảnh báo (escalate) trong các kịch bản cận ngưỡng mà rule-based thông thường bỏ sót.
 
-- **RQ3**: MQTT ingest có cải thiện độ trễ/độ tin cậy so với HTTP trong điều kiện tương đương không?
-  - **H3**: Với cùng tần suất gửi, MQTT path có tỉ lệ drop thấp và latency ổn định hơn (cần đo).
+- **RQ3**: Cooldown Discord có giảm spam mà vẫn giữ được thông tin chuyển trạng thái quan trọng?
+  - **H3**: Với chuỗi dữ liệu lặp lại cùng trạng thái nguy hiểm, số lượng alert được giảm thiểu tối đa nhờ cơ chế cooldown nhưng vẫn gửi cảnh báo mới khi có sự thay đổi trạng thái.
 
-- **RQ4**: Cooldown Discord có giảm spam mà vẫn giữ được thông tin chuyển trạng thái quan trọng?
-  - **H4**: Với chuỗi readings lặp lại cùng status, số alert giảm mạnh mà vẫn gửi khi status thay đổi.
+## 5.2. Thiết kế thí nghiệm (experimental design)
 
-## 5.2. Định nghĩa chỉ số đo (metrics)
-
-### 5.2.1. E2E Latency
-
-Định nghĩa thời điểm:
-
-- `T_send`: thời điểm ESP32 tạo payload và gửi.
-- `T_recv`: thời điểm backend nhận request/message.
-- `T_db`: thời điểm insert DB hoàn tất.
-- `T_ui`: thời điểm dashboard hiển thị reading mới.
-- `T_alert`: thời điểm Discord nhận alert.
-
-Các độ trễ:
-
-- Ingest latency: `T_db - T_recv`.
-- E2E (to DB): `T_db - T_send`.
-- E2E (to alert): `T_alert - T_send`.
-
-**Cách đo đề xuất**: ghi timestamp trong payload (firmware), log backend, và timestamp Discord message.
-
-#### Gợi ý triển khai đo (không can thiệp sâu vào code)
-
-- Firmware: thêm trường `sent_at_ms` (millis) hoặc epoch time nếu có NTP.
-- Backend: log `received_at` và `db_inserted_at`.
-- Discord: dùng timestamp message hoặc log thời điểm POST webhook thành công.
-
-Trong trường hợp không đồng bộ clock giữa thiết bị và server, có thể đo tương đối trên server bằng cách ghi nhận `received_at` và `db_inserted_at`, hoặc đo E2E từ “thời điểm payload đến server” thay vì “thời điểm cảm biến đọc”.
-
-#### Gợi ý triển khai đo (không can thiệp sâu vào code)
-
-- Firmware: thêm trường `sent_at_ms` (millis) hoặc epoch time nếu có NTP.
-- Backend: log `received_at` và `db_inserted_at`.
-- Discord: dùng timestamp message hoặc log thời điểm POST webhook thành công.
-
-Trong trường hợp không đồng bộ clock giữa thiết bị và server, có thể đo tương đối trên server bằng cách ghi nhận `received_at` và `db_inserted_at`, hoặc đo E2E từ “thời điểm payload đến server” thay vì “thời điểm cảm biến đọc”.
-
-### 5.2.2. Throughput ingest
-
-- HTTP: requests/second (RPS) trước khi backend bắt đầu tăng lỗi/timeout.
-- MQTT: messages/second trước khi backlog hoặc processing delay tăng.
-
-Ghi chú: với SQLite, throughput thực tế phụ thuộc locking/concurrency. Khi benchmark, cần ghi rõ số worker, chế độ chạy (reload on/off), và tài nguyên VM.
-
-Ghi chú: với SQLite, throughput thực tế phụ thuộc locking/concurrency. Khi benchmark, cần ghi rõ số worker, chế độ chạy (reload on/off), và tài nguyên VM.
-
-### 5.2.3. Reliability
-
-- Tỉ lệ lỗi schema/payload.
-- Tỉ lệ mất kết nối MQTT và thời gian reconnect.
-- Tỉ lệ mất dữ liệu (gửi nhưng không có record trong DB).
-
-### 5.2.4. Chất lượng mô hình ML
-
-Trên tập dữ liệu thật có nhãn (label):
-
-- Accuracy, Precision, Recall, F1.
-- Confusion Matrix cho 3 lớp {NORMAL, WARNING, CRITICAL}.
-
-Lưu ý: nếu nhãn được suy ra từ rule-based thì đây chỉ là “tái hiện rule”, không đánh giá được giá trị ML thật. Do đó cần xây dựng nhãn theo cách độc lập (ví dụ expert labeling hoặc tiêu chuẩn môi trường).
-
-#### Gợi ý pipeline dữ liệu thật
-
-1. Thu thập data thô (temperature, humidity, gas, light, noise) theo thời gian.
-2. Gắn nhãn theo quy tắc độc lập: ví dụ dựa trên tiêu chuẩn môi trường/khuyến nghị y tế, hoặc expert judgement theo bối cảnh phòng.
-3. Split theo thời gian (time-based split) để tránh leakage.
-4. Đánh giá theo confusion matrix và error analysis (những điều kiện nào ML thường nhầm).
-
-#### Gợi ý pipeline dữ liệu thật
-
-1. Thu thập data thô (temperature, humidity, gas, light, noise) theo thời gian.
-2. Gắn nhãn theo quy tắc độc lập: ví dụ dựa trên tiêu chuẩn môi trường/khuyến nghị y tế, hoặc expert judgement theo bối cảnh phòng.
-3. Split theo thời gian (time-based split) để tránh leakage.
-4. Đánh giá theo confusion matrix và error analysis (những điều kiện nào ML thường nhầm).
-
-### 5.2.5. Alert quality (Discord)
-
-- Alert count per hour.
-- Duplicate suppression ratio (do cooldown).
-- Transition coverage: % lần chuyển NORMAL→WARNING→CRITICAL được alert.
-
-## 5.3. Thiết kế thí nghiệm (experimental design)
-
-### 5.3.1. Thiết lập môi trường
+### 5.2.1. Thiết lập môi trường
 
 - Chế độ local Docker Compose.
 - Chế độ cloud Azure VM.
@@ -1100,89 +692,36 @@ Ngoài ra, cần ghi rõ:
 - Có/không có file model `comfort_model.pkl`.
 - Cấu hình broker MQTT (user/pass nếu có).
 
-Ngoài ra, cần ghi rõ:
+### 5.2.2. Kịch bản demo chức năng (functional scenarios)
 
-- Version backend (`APP_VERSION`).
-- Có/không có file model `comfort_model.pkl`.
-- Cấu hình broker MQTT (user/pass nếu có).
+> **Ghi chú thực hiện**: Demo 1–4 được thực hiện trực tiếp trên **thiết bị thật** (ESP32 + cảm biến). Nhóm tác động vật lý vào môi trường đo (nhiệt độ, khí gas, ánh sáng, tiếng ồn) và quan sát phản hồi trên Dashboard + Discord. Demo 5–7 được thực hiện qua **terminal/lệnh** vì tính chất học thuật cần kiểm soát chính xác tham số đầu vào (cooldown timing, MQTT path, ML boundary).
 
-### 5.3.2. Kịch bản demo chức năng (functional scenarios)
+#### Demo 1 – NORMAL Baseline _(thiết bị thật)_
 
-*(Lưu ý: Trong các lệnh `curl` dưới đây, thay thế `localhost:8000` bằng IP của Azure VM `20.212.105.13:8000` nếu thực hiện kiểm thử từ xa).*
-
-#### Demo 1 – NORMAL Baseline
 - **Mục tiêu:** Xác nhận hệ thống hoạt động đúng với dữ liệu môi trường an toàn, không phát sinh cảnh báo.
-- **Cách chạy:**
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/sensor/readings \
-    -H "Content-Type: application/json" \
-    -H "X-API-KEY: IOT_SECRET_2026" \
-    -d '{
-      "device_id": "esp32_01",
-      "temperature": 25.0,
-      "humidity": 60.0,
-      "gas": 500,
-      "light": 300,
-      "noise": 200
-    }'
-  ```
-- **Kết quả mong đợi:** Response trả về `status_label = "NORMAL"`, `risk_score = 0`, `reasons = ["All monitored indicators are within acceptable range"]`. Dashboard hiển thị trạng thái xanh. Không gửi Discord alert.
+- **Cách thực hiện:** Đặt ESP32 trong điều kiện phòng bình thường. Quan sát dashboard và Discord.
+- **Kết quả mong đợi:** Dashboard hiển thị `status_label = "NORMAL"`, `risk_score = 0`, trạng thái xanh. Không gửi Discord alert.
 
-#### Demo 2 – WARNING Cảnh báo Nhiệt Độ
+#### Demo 2 – WARNING Cảnh báo Nhiệt Độ _(thiết bị thật)_
+
 - **Mục tiêu:** Chứng minh hệ thống phát hiện cảnh báo nhiệt độ đơn lẻ và giải thích rõ ràng lý do.
-- **Cách chạy:**
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/sensor/readings \
-    -H "Content-Type: application/json" \
-    -H "X-API-KEY: IOT_SECRET_2026" \
-    -d '{
-      "device_id": "esp32_01",
-      "temperature": 37.0,
-      "humidity": 60.0,
-      "gas": 500,
-      "light": 300,
-      "noise": 200
-    }'
-  ```
-- **Kết quả mong đợi:** Trả về `status_label = "WARNING"`, `risk_score = 20`, `reasons = ["High temperature"]`. Discord gửi cảnh báo thành công.
+- **Cách thực hiện:** Đưa cảm biến DHT22 gần nguồn nhiệt (máy sấy, đèn nhiệt) để nhiệt độ vượt ngưỡng 35°C.
+- **Kết quả mong đợi:** Dashboard trả về `status_label = "WARNING"`, `reasons = ["High temperature"]`. Discord gửi cảnh báo thành công.
 
-#### Demo 3 – CRITICAL Gas Nguy Hiểm
+#### Demo 3 – CRITICAL Gas Nguy Hiểm _(thiết bị thật)_
+
 - **Mục tiêu:** Xác nhận hệ thống kích hoạt mức `CRITICAL` lập tức khi nồng độ gas vượt ngưỡng nguy hiểm và phát cảnh báo khẩn.
-- **Cách chạy:**
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/sensor/readings \
-    -H "Content-Type: application/json" \
-    -H "X-API-KEY: IOT_SECRET_2026" \
-    -d '{
-      "device_id": "esp32_01",
-      "temperature": 25.0,
-      "humidity": 60.0,
-      "gas": 3500,
-      "light": 300,
-      "noise": 200
-    }'
-  ```
-- **Kết quả mong đợi:** Trả về `status_label = "CRITICAL"`, `risk_score = 40`, `reasons = ["Critical gas concentration"]`. Discord nhận alert dạng embed có viền đỏ.
+- **Cách thực hiện:** Đưa nguồn khí (cồn, khí bật lửa — với mức độ kiểm soát an toàn) gần cảm biến MQ135.
+- **Kết quả mong đợi:** Dashboard trả về `status_label = "CRITICAL"`, `reasons = ["Critical gas concentration"]`. Discord nhận alert dạng embed có viền đỏ, LED và buzzer trên ESP32 kích hoạt.
 
-#### Demo 4 – Multi-factor Penalty
+#### Demo 4 – Multi-factor Penalty _(thiết bị thật)_
+
 - **Mục tiêu:** Chứng minh cơ chế penalty khi nhiều yếu tố bất thường đồng thời xảy ra, đẩy `risk_score` lên mức cao phản ánh mức độ nguy hại kết hợp.
-- **Cách chạy:**
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/sensor/readings \
-    -H "Content-Type: application/json" \
-    -H "X-API-KEY: IOT_SECRET_2026" \
-    -d '{
-      "device_id": "esp32_01",
-      "temperature": 36.0,
-      "humidity": 88.0,
-      "gas": 2500,
-      "light": 8,
-      "noise": 2200
-    }'
-  ```
-- **Kết quả mong đợi:** Response trả về `status_label = "CRITICAL"`, `risk_score = 95` (đã cộng penalty `+10` vì số chỉ số bất thường >= 3). Danh sách `reasons` chứa 6 lý do bao gồm lý do compound penalty `"Multiple abnormal environmental indicators"`.
+- **Cách thực hiện:** Kết hợp nhiệt độ cao + che ánh sáng + đưa khí gần cảm biến để kích hoạt ≥ 3 điều kiện bất thường cùng lúc.
+- **Kết quả mong đợi:** Dashboard trả về `status_label = "CRITICAL"`, `risk_score` cao (cộng penalty `+10` vì số chỉ số bất thường ≥ 3). Danh sách `reasons` chứa nhiều lý do bao gồm compound penalty `"Multiple abnormal environmental indicators"`.
 
-#### Demo 5 – Cooldown Discord Chống Spam
+#### Demo 5 – Cooldown Discord Chống Spam _(terminal)_
+
 - **Mục tiêu:** Xác nhận cơ chế cooldown hoạt động đúng: chỉ gửi một Discord alert duy nhất trong khoảng thời gian cooldown, tránh ngập lụt kênh thông báo dù dữ liệu nguy hiểm được gửi liên tục.
 - **Cách chạy:**
   ```bash
@@ -1196,7 +735,8 @@ Ngoài ra, cần ghi rõ:
   ```
 - **Kết quả mong đợi:** Cả 5 response đều trả về `status_label = "CRITICAL"` và được lưu trữ đầy đủ trong SQLite database. Tuy nhiên, chỉ có duy nhất 1 Discord alert được gửi đi, 4 lần còn lại bị chặn bởi cooldown vì chưa hết 60 giây.
 
-#### Demo 6 – MQTT Ingest
+#### Demo 6 – MQTT Ingest _(terminal)_
+
 - **Mục tiêu:** Chứng minh kênh truyền nhận dữ liệu qua MQTT broker hoạt động song song với HTTP, chia sẻ chung pipeline xử lý/đánh giá dữ liệu và cập nhật heartbeat.
 - **Cách chạy (thực hiện qua SSH bên trong VM hoặc qua container console để tránh tường lửa chặn cổng 1883 từ ngoài):**
   ```bash
@@ -1211,7 +751,8 @@ Ngoài ra, cần ghi rõ:
   ```
 - **Kết quả mong đợi:** Backend nhận message qua MQTT subscriber, xử lý qua pipeline và lưu vào SQLite thành công. API latest trả về đúng thông tin vừa gửi. Đồng thời, khi truy cập endpoint health `GET /api/v1/system/health`, trạng thái thiết bị hiển thị là `online` nhờ cơ chế cập nhật heartbeat tích hợp trong luồng MQTT.
 
-#### Demo 7 – Leo thang rủi ro bằng mô hình RandomForest (Hybrid ML)
+#### Demo 7 – Leo thang rủi ro bằng mô hình RandomForest (Hybrid ML) _(terminal)_
+
 - **Mục tiêu:** Xác nhận logic Hybrid ML hoạt động đúng: mô hình RandomForest phân loại độ tiện nghi dựa trên cả 5 đặc trưng, tự động nâng mức cảnh báo và đính kèm lý do `"AI Anomaly Detection"` khi phát hiện dấu hiệu bất thường.
 - **Cách chạy:**
   ```bash
@@ -1230,61 +771,6 @@ Ngoài ra, cần ghi rõ:
 - **Kết quả mong đợi:** Response trả về trạng thái cảnh báo đã được ML leo thang cao hơn mức rule-based thông thường (nếu có sự lệch pha), đồng thời trường `reasons` ghi nhận `"AI Anomaly Detection"`.
 
 Mỗi kịch bản nên có checklist “evidence” (ảnh dashboard, log, DB extract) để đảm bảo tái lập và đủ cơ sở viết kết quả.
-
-### 5.3.3. Kịch bản tải (load scenarios)
-
-- **HTTP load**: dùng script simulator hoặc tool bắn request.
-- **MQTT load**: publish nhiều message/giây.
-
-Quan sát:
-
-- lỗi/timeout
-- độ trễ insert DB
-- CPU/RAM container (nếu có công cụ đo)
-
-## 5.4. Thu thập dữ liệu và artifact
-
-Đề xuất artifact tối thiểu cho mỗi lần chạy:
-
-- Export DB hoặc query `history` ra JSON/CSV.
-- Log backend (docker logs) chứa timestamp.
-- Screenshot dashboard.
-- Screenshot Discord alert.
-
-Bảng template để điền kết quả:
-
-| Scenario | Mode (HTTP/MQTT) | Interval | Alerts sent | Drop rate | Notes |
-| -------- | ---------------- | -------: | ----------: | --------: | ----- |
-| Baseline | HTTP             |       5s |           0 |         0 |       |
-
-Để đánh giá nghiêm túc hơn, có thể mở rộng template theo:
-
-| Scenario | Mode | N messages | N persisted | Persist ratio | P50 ingest latency | P99 ingest latency | Discord sent | Cooldown hits | Notes |
-| -------- | ---- | ---------: | ----------: | ------------: | -----------------: | -----------------: | -----------: | ------------: | ----- |
-
-Trong báo cáo đồ án, các cột latency có thể để trống và chỉ mô tả cách đo nếu chưa kịp thực nghiệm.
-
-Để đánh giá nghiêm túc hơn, có thể mở rộng template theo:
-
-| Scenario | Mode | N messages | N persisted | Persist ratio | P50 ingest latency | P99 ingest latency | Discord sent | Cooldown hits | Notes |
-| -------- | ---- | ---------: | ----------: | ------------: | -----------------: | -----------------: | -----------: | ------------: | ----- |
-
-Trong báo cáo đồ án, các cột latency có thể để trống và chỉ mô tả cách đo nếu chưa kịp thực nghiệm.
-
-## 5.5. Mối đe dọa đến tính đúng đắn (threats to validity)
-
-- **Sensor calibration**: MQ135/noise có độ lệch lớn; threshold có thể không phản ánh thực tế.
-- **Nhãn ML**: nếu label dựa vào rule-based sẽ không chứng minh được lợi ích ML.
-- **Network variability**: cloud latency biến động làm méo E2E.
-- **Clock synchronization**: nếu đo E2E bằng timestamp từ thiết bị và server, cần đồng bộ thời gian.
-- **Cooldown confounder**: cooldown làm giảm alert count; cần phân biệt “giảm spam” vs “bỏ sót chuyển trạng thái”.
-
-Ngoài ra:
-
-- **Synthetic model bias**: nếu model được huấn luyện trên dữ liệu synthetic, kết quả có thể không phản ánh môi trường thật.
-- **Edge vs backend threshold mismatch**: firmware có ngưỡng local riêng; có thể xảy ra trường hợp edge alert nhưng backend không WARNING/CRITICAL (hoặc ngược lại). Đây là điểm cần thống nhất khi demo.
-
----
 
 # KẾT LUẬN
 
