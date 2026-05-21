@@ -1,5 +1,10 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from the root directory .env file
+root_env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=root_env_path)
 
 
 class Settings:

@@ -84,7 +84,7 @@ Mục tiêu cụ thể:
 - Backend FastAPI (Python), database SQLite, dashboard HTML/Jinja2.
 - MQTT broker (Mosquitto) và subscriber phía backend.
 - Discord webhook alert.
-- Hybrid engine: rule-based là chính; ML RandomForest dựa trên tập đặc trưng {temperature, humidity, gas}.
+- Hybrid engine: rule-based là chính; ML RandomForest dựa trên tập đặc trưng {temperature, humidity, gas, light, noise}.
 
 **Ngoài phạm vi / giới hạn hiện tại**:
 
@@ -150,7 +150,7 @@ Hạn chế:
 
 RandomForest là mô hình ensemble trên cây quyết định, phù hợp cho dữ liệu tabular và thường ổn định với nhiễu. Trong dự án:
 
-- Feature set tối thiểu: `{temperature, humidity, gas}`.
+- Feature set: `{temperature, humidity, gas, light, noise}`.
 - Output: mức comfort/risk (0/1/2 tương ứng NORMAL/WARNING/CRITICAL).
 
 Trong thiết kế hybrid, ML không thay thế rule-based mà dùng để **escalate** khi phát hiện dấu hiệu bất thường. Cách làm này giảm rủi ro “ML sai hoàn toàn” nhưng vẫn tận dụng được khả năng tổng hợp phi tuyến của mô hình.
@@ -491,14 +491,13 @@ output: comfort_level, status_label, risk_score, reasons
 ### 3.8.1. Vai trò ML trong hybrid
 
 - Rule-based vẫn là “nguồn chân lý” cho `risk_score` và lý do.
-- ML dự đoán `ai_comfort ∈ {0,1,2}` trên 3 feature `{temp, humid, gas}`.
+- ML dự đoán `ai_comfort ∈ {0,1,2}` trên 5 feature `{temp, humid, gas, light, noise}`.
 - Kết quả cuối: `final_comfort = max(rule_comfort, ai_comfort)`.
 - Nếu ML leo thang (escalate), hệ thống append lý do: `"AI Anomaly Detection"`.
 
 ### 3.8.2. Giới hạn hiện tại
 
 - Nếu ML nâng mức nhưng `risk_score` vẫn theo rule-based, có thể tạo ra “bất nhất mềm”: trạng thái tăng nhưng điểm rủi ro không tăng tương ứng.
-- ML bỏ qua `light` và `noise`.
 - Model file `comfort_model.pkl` có thể không tồn tại trong runtime; khi đó hệ thống tự fallback về rule-only.
 
 Nhận xét khoa học: “bất nhất mềm” không nhất thiết là sai trong bối cảnh đồ án (vì `risk_score` được định nghĩa là rule-score), nhưng cần **định nghĩa rõ semantics**:
@@ -511,7 +510,7 @@ Nhận xét khoa học: “bất nhất mềm” không nhất thiết là sai t
 Trong đánh giá, nên đo riêng:
 
 - Tỷ lệ case ML escalate từ NORMAL→WARNING hoặc WARNING→CRITICAL.
-- Phân tích nguyên nhân: do feature set giới hạn (chỉ temp/humid/gas) hay do phân phối dữ liệu.
+- Phân tích nguyên nhân: do phân phối dữ liệu hay do sự biến đổi môi trường thực tế.
 
 ## 3.9. Thiết kế khuyến nghị (recommendation)
 
@@ -532,7 +531,7 @@ Endpoint `GET /api/v1/system/health` trả về:
 - Trạng thái database (ok/error)
 - Trạng thái thiết bị (online/offline) dựa trên timestamp `last_seen`
 
-Lưu ý kỹ thuật: `last_seen` được cập nhật trong pipeline HTTP ingest; đường MQTT ingest hiện chưa cập nhật `last_seen`. Đây là một điểm cần cải tiến nếu muốn health phản ánh “thiết bị đang gửi qua MQTT”.
+Lưu ý kỹ thuật: `last_seen` được cập nhật trong cả hai pipeline HTTP ingest và MQTT ingest, đảm bảo endpoint health phản ánh chính xác trạng thái online/offline của thiết bị từ bất kỳ kênh truyền dẫn nào.
 
 ## 3.12. Quản trị cấu hình và tham số hệ thống
 
@@ -680,7 +679,7 @@ Backend được tổ chức theo mô hình “modular FastAPI”:
 
 | Nhóm     | Thành phần           | Trách nhiệm                                               | Ghi chú                             |
 | -------- | -------------------- | --------------------------------------------------------- | ----------------------------------- |
-| Routers  | sensor_router        | Ingest + query latest/history + legacy endpoints          | HTTP path có heartbeat              |
+| Routers  | sensor_router        | Ingest + query latest/history + legacy endpoints          | Tích hợp cập nhật heartbeat         |
 | Routers  | dashboard_router     | Render dashboard HTML + token check                       | Presentation                        |
 | Routers  | system_router        | Health check DB + device heartbeat                        | Device heartbeat hiện theo app-wide |
 | Services | edge_service         | Rule-based scoring + reasons                              | Nguồn `risk_score`                  |
@@ -697,7 +696,7 @@ Mục đích của bảng này là giúp thuyết minh rõ “ai làm gì” và
 
 | Nhóm     | Thành phần           | Trách nhiệm                                               | Ghi chú                             |
 | -------- | -------------------- | --------------------------------------------------------- | ----------------------------------- |
-| Routers  | sensor_router        | Ingest + query latest/history + legacy endpoints          | HTTP path có heartbeat              |
+| Routers  | sensor_router        | Ingest + query latest/history + legacy endpoints          | Tích hợp cập nhật heartbeat         |
 | Routers  | dashboard_router     | Render dashboard HTML + token check                       | Presentation                        |
 | Routers  | system_router        | Health check DB + device heartbeat                        | Device heartbeat hiện theo app-wide |
 | Services | edge_service         | Rule-based scoring + reasons                              | Nguồn `risk_score`                  |
@@ -1109,15 +1108,126 @@ Ngoài ra, cần ghi rõ:
 
 ### 5.3.2. Kịch bản demo chức năng (functional scenarios)
 
-1. **Baseline NORMAL**: tất cả chỉ số trong ngưỡng.
-2. **WARNING theo nhiệt độ/độ ẩm**: vượt ngưỡng cảnh báo.
-3. **CRITICAL theo gas**: vượt ngưỡng critical.
-4. **Multi-factor**: >= 3 chỉ số bất thường để kích hoạt penalty.
-5. **Compatibility**: gửi vào `/data` và `/api/v1/sensor/readings`, so sánh output.
-6. **MQTT path**: publish vào `iot/<device>/sensor` và kiểm tra DB + dashboard.
-7. **Discord cooldown**: gửi readings liên tục cùng status và quan sát số alert.
+*(Lưu ý: Trong các lệnh `curl` dưới đây, thay thế `localhost:8000` bằng IP của Azure VM `20.212.105.13:8000` nếu thực hiện kiểm thử từ xa).*
 
-Mỗi kịch bản nên có checklist “evidence” (ảnh dashboard, log, DB extract) để đảm bảo tái lập và đủ cơ sở viết kết quả.
+#### Demo 1 – NORMAL Baseline
+- **Mục tiêu:** Xác nhận hệ thống hoạt động đúng với dữ liệu môi trường an toàn, không phát sinh cảnh báo.
+- **Cách chạy:**
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/sensor/readings \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: IOT_SECRET_2026" \
+    -d '{
+      "device_id": "esp32_01",
+      "temperature": 25.0,
+      "humidity": 60.0,
+      "gas": 500,
+      "light": 300,
+      "noise": 200
+    }'
+  ```
+- **Kết quả mong đợi:** Response trả về `status_label = "NORMAL"`, `risk_score = 0`, `reasons = ["All monitored indicators are within acceptable range"]`. Dashboard hiển thị trạng thái xanh. Không gửi Discord alert.
+
+#### Demo 2 – WARNING Cảnh báo Nhiệt Độ
+- **Mục tiêu:** Chứng minh hệ thống phát hiện cảnh báo nhiệt độ đơn lẻ và giải thích rõ ràng lý do.
+- **Cách chạy:**
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/sensor/readings \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: IOT_SECRET_2026" \
+    -d '{
+      "device_id": "esp32_01",
+      "temperature": 37.0,
+      "humidity": 60.0,
+      "gas": 500,
+      "light": 300,
+      "noise": 200
+    }'
+  ```
+- **Kết quả mong đợi:** Trả về `status_label = "WARNING"`, `risk_score = 20`, `reasons = ["High temperature"]`. Discord gửi cảnh báo thành công.
+
+#### Demo 3 – CRITICAL Gas Nguy Hiểm
+- **Mục tiêu:** Xác nhận hệ thống kích hoạt mức `CRITICAL` lập tức khi nồng độ gas vượt ngưỡng nguy hiểm và phát cảnh báo khẩn.
+- **Cách chạy:**
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/sensor/readings \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: IOT_SECRET_2026" \
+    -d '{
+      "device_id": "esp32_01",
+      "temperature": 25.0,
+      "humidity": 60.0,
+      "gas": 3500,
+      "light": 300,
+      "noise": 200
+    }'
+  ```
+- **Kết quả mong đợi:** Trả về `status_label = "CRITICAL"`, `risk_score = 40`, `reasons = ["Critical gas concentration"]`. Discord nhận alert dạng embed có viền đỏ.
+
+#### Demo 4 – Multi-factor Penalty
+- **Mục tiêu:** Chứng minh cơ chế penalty khi nhiều yếu tố bất thường đồng thời xảy ra, đẩy `risk_score` lên mức cao phản ánh mức độ nguy hại kết hợp.
+- **Cách chạy:**
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/sensor/readings \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: IOT_SECRET_2026" \
+    -d '{
+      "device_id": "esp32_01",
+      "temperature": 36.0,
+      "humidity": 88.0,
+      "gas": 2500,
+      "light": 8,
+      "noise": 2200
+    }'
+  ```
+- **Kết quả mong đợi:** Response trả về `status_label = "CRITICAL"`, `risk_score = 95` (đã cộng penalty `+10` vì số chỉ số bất thường >= 3). Danh sách `reasons` chứa 6 lý do bao gồm lý do compound penalty `"Multiple abnormal environmental indicators"`.
+
+#### Demo 5 – Cooldown Discord Chống Spam
+- **Mục tiêu:** Xác nhận cơ chế cooldown hoạt động đúng: chỉ gửi một Discord alert duy nhất trong khoảng thời gian cooldown, tránh ngập lụt kênh thông báo dù dữ liệu nguy hiểm được gửi liên tục.
+- **Cách chạy:**
+  ```bash
+  for i in $(seq 1 5); do
+    curl -s -X POST http://localhost:8000/api/v1/sensor/readings \
+      -H 'Content-Type: application/json' \
+      -H 'X-API-KEY: IOT_SECRET_2026' \
+      -d '\''{"device_id":"esp32_01","temperature":25,"humidity":60,"gas":3500,"light":300,"noise":200}'\'' | jq .data.status_label
+    sleep 6
+  done
+  ```
+- **Kết quả mong đợi:** Cả 5 response đều trả về `status_label = "CRITICAL"` và được lưu trữ đầy đủ trong SQLite database. Tuy nhiên, chỉ có duy nhất 1 Discord alert được gửi đi, 4 lần còn lại bị chặn bởi cooldown vì chưa hết 60 giây.
+
+#### Demo 6 – MQTT Ingest
+- **Mục tiêu:** Chứng minh kênh truyền nhận dữ liệu qua MQTT broker hoạt động song song với HTTP, chia sẻ chung pipeline xử lý/đánh giá dữ liệu và cập nhật heartbeat.
+- **Cách chạy (thực hiện qua SSH bên trong VM hoặc qua container console để tránh tường lửa chặn cổng 1883 từ ngoài):**
+  ```bash
+  # Truy cập container MQTT broker trên VM để publish trực tiếp:
+  docker exec -it iot-mqtt-broker mosquitto_pub \
+    -t '\''iot/esp32_01/sensor'\'' \
+    -m '\''{"device_id":"esp32_01","temperature":30,"humidity":75,"gas":1800,"light":100,"noise":1500}''\''
+  ```
+  Kiểm tra kết quả qua HTTP API:
+  ```bash
+  curl http://localhost:8000/api/v1/sensor/latest
+  ```
+- **Kết quả mong đợi:** Backend nhận message qua MQTT subscriber, xử lý qua pipeline và lưu vào SQLite thành công. API latest trả về đúng thông tin vừa gửi. Đồng thời, khi truy cập endpoint health `GET /api/v1/system/health`, trạng thái thiết bị hiển thị là `online` nhờ cơ chế cập nhật heartbeat tích hợp trong luồng MQTT.
+
+#### Demo 7 – Leo thang rủi ro bằng mô hình RandomForest (Hybrid ML)
+- **Mục tiêu:** Xác nhận logic Hybrid ML hoạt động đúng: mô hình RandomForest phân loại độ tiện nghi dựa trên cả 5 đặc trưng, tự động nâng mức cảnh báo và đính kèm lý do `"AI Anomaly Detection"` khi phát hiện dấu hiệu bất thường.
+- **Cách chạy:**
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/sensor/readings \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: IOT_SECRET_2026" \
+    -d '{
+      "device_id": "esp32_01",
+      "temperature": 30.0,
+      "humidity": 75.0,
+      "gas": 1800,
+      "light": 100,
+      "noise": 1500
+    }'
+  ```
+- **Kết quả mong đợi:** Response trả về trạng thái cảnh báo đã được ML leo thang cao hơn mức rule-based thông thường (nếu có sự lệch pha), đồng thời trường `reasons` ghi nhận `"AI Anomaly Detection"`.
 
 Mỗi kịch bản nên có checklist “evidence” (ảnh dashboard, log, DB extract) để đảm bảo tái lập và đủ cơ sở viết kết quả.
 
@@ -1185,7 +1295,7 @@ Hạn chế chính ở thời điểm viết báo cáo là thiếu bộ dữ li�
 ## Hướng phát triển đề xuất
 
 1. **Chuẩn hóa artifact đánh giá**: thêm thư mục `results/` và mỗi lần chạy test sinh `summary.json`, `timeseries.csv`, `notes.md`.
-2. **Cải thiện heartbeat**: theo dõi online/offline theo từng `device_id` và cập nhật `last_seen` cho cả HTTP và MQTT ingest.
+2. **Cải thiện heartbeat**: theo dõi online/offline độc lập cho từng `device_id` (hiện tại đang theo dõi app-wide).
 3. **Tách notification thành hàng đợi**: đưa gửi Discord ra khỏi luồng ingest, bổ sung backoff/rate-limit handling.
 4. **Migrate DB khi cần scale**: SQLite phù hợp đồ án; khi tăng tải/multi-writer nên chuyển PostgreSQL.
 5. **Bảo mật**: HTTPS/TLS, rotate API key, thay dashboard token query param bằng session/cookie hoặc header-based auth.

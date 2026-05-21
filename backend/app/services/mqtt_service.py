@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import Any
 
 from pydantic import ValidationError
@@ -56,7 +57,7 @@ def _handle_sensor_payload(payload_dict: dict[str, Any]) -> None:
     )
 
 
-def start_mqtt_subscriber():
+def start_mqtt_subscriber(app=None):
     """
     Start MQTT subscriber in a background network loop.
 
@@ -89,6 +90,8 @@ def start_mqtt_subscriber():
             raw_payload = message.payload.decode("utf-8")
             payload_dict = json.loads(raw_payload)
             _handle_sensor_payload(payload_dict)
+            if app is not None:
+                app.state.last_seen = time.time()
         except json.JSONDecodeError:
             logger.exception("Invalid MQTT JSON payload on topic %s.", message.topic)
         except ValidationError:

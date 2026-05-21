@@ -48,10 +48,14 @@ int soundValue = 0;
 // Ngưỡng cảnh báo
 // =========================
 float tempThreshold = 35.0;
+float tempLowThreshold = 18.0;
 float humidityThreshold = 85.0;
+float humidityLowThreshold = 30.0;
 int gasThreshold = 2500;
 int soundThreshold = 2500;
-float lightThreshold = 20.0;
+float lightThreshold = 50.0;
+unsigned long lastBuzzerAlert = 0;
+const long buzzerInterval = 1000; // Khoảng cách giữa các tiếng bíp (1 giây)
 
 // INTENT: Resolve the backend server IP using mDNS discovery or Cloud fallback.
 void resolveServerIP() {
@@ -94,8 +98,8 @@ void printSensorData() {
 bool checkAlert() {
   bool alert = false;
 
-  if (!isnan(temperature) && temperature > tempThreshold) alert = true;
-  if (!isnan(humidity) && humidity > humidityThreshold) alert = true;
+  if (!isnan(temperature) && (temperature > tempThreshold || temperature < tempLowThreshold)) alert = true;
+  if (!isnan(humidity) && (humidity > humidityThreshold || humidity < humidityLowThreshold)) alert = true;
   if (gasValue > gasThreshold) alert = true;
   if (soundValue > soundThreshold) alert = true;
   if (lux < lightThreshold) alert = true;
@@ -134,7 +138,11 @@ void sendDataToServer() {
 void controlDevices(bool alert) {
   if (alert) {
     digitalWrite(LED_PIN, HIGH);
-    tone(BUZZER_PIN, 2000, 100);
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastBuzzerAlert >= buzzerInterval) {
+      lastBuzzerAlert = currentMillis;
+      tone(BUZZER_PIN, 2000, 150); // Bíp ngắn 150ms
+    }
   } else {
     digitalWrite(LED_PIN, LOW);
     noTone(BUZZER_PIN);

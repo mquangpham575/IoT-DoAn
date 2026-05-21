@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
     async def on_startup() -> None:
         init_db()
         app.state.last_seen = 0
-        app.state.mqtt_client = start_mqtt_subscriber()
+        app.state.mqtt_client = start_mqtt_subscriber(app)
 
     @app.on_event("shutdown")
     async def on_shutdown() -> None:

@@ -32,12 +32,14 @@ def evaluate_sensor_reading(sensor_data: dict[str, Any]) -> dict[str, Any]:
     ai_comfort = -1
     if model:
         try:
-            # Match training feature set: temp, humid, gas
+            # Match training feature set: temp, humid, gas, light, noise
             input_df = pd.DataFrame([[
                 sensor_data.get("temperature", 0),
                 sensor_data.get("humidity", 0),
-                sensor_data.get("gas", 0)
-            ]], columns=['temp', 'humid', 'gas'])
+                sensor_data.get("gas", 0),
+                sensor_data.get("light", 0),
+                sensor_data.get("noise", 0)
+            ]], columns=['temp', 'humid', 'gas', 'light', 'noise'])
             ai_comfort = int(model.predict(input_df)[0])
         except Exception as e:
             print(f"AI Prediction error: {e}")
