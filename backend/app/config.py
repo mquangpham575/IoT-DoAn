@@ -50,6 +50,25 @@ class Settings:
     MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
     MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 
+    # Threshold settings for comfort evaluation
+    TEMP_CRITICAL = float(os.getenv("TEMP_CRITICAL", "40.0"))
+    TEMP_HIGH = float(os.getenv("TEMP_HIGH", "35.0"))
+    TEMP_LOW = float(os.getenv("TEMP_LOW", "18.0"))
+
+    HUMID_VERY_HIGH = float(os.getenv("HUMID_VERY_HIGH", "90.0"))
+    HUMID_HIGH = float(os.getenv("HUMID_HIGH", "85.0"))
+    HUMID_LOW = float(os.getenv("HUMID_LOW", "30.0"))
+
+    GAS_CRITICAL = int(os.getenv("GAS_CRITICAL", "3000"))
+    GAS_HIGH = int(os.getenv("GAS_HIGH", "2000"))
+    GAS_MODERATE = int(os.getenv("GAS_MODERATE", "1200"))
+
+    LIGHT_EXTREMELY_LOW = float(os.getenv("LIGHT_EXTREMELY_LOW", "10.0"))
+    LIGHT_LOW = float(os.getenv("LIGHT_LOW", "50.0"))
+
+    NOISE_HIGH = int(os.getenv("NOISE_HIGH", "3000"))
+    NOISE_MODERATE = int(os.getenv("NOISE_MODERATE", "2000"))
+
 
 settings = Settings()
 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)

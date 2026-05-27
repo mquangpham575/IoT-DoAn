@@ -53,9 +53,12 @@ def evaluate_sensor_reading(sensor_data: dict[str, Any]) -> dict[str, Any]:
         assessment["comfort_level"] = final_comfort
         assessment["status_label"] = status_map.get(final_comfort, "UNKNOWN")
         assessment["reasons"].append("AI Anomaly Detection")
+        if "reason_codes" not in assessment:
+            assessment["reason_codes"] = []
+        assessment["reason_codes"].append("ai_anomaly")
 
     recommendation = build_recommendation(
-        reasons=assessment["reasons"],
+        reason_codes=assessment.get("reason_codes", []),
         status_label=assessment["status_label"],
     )
 
